@@ -11,6 +11,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.text.InputType
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -26,6 +28,8 @@ class MainActivity : Activity() {
     private lateinit var content: LinearLayout
     private var current = "Accueil"
     private var engineOnline = false
+    private lateinit var profileStore: LocalProfileStore
+    private var authenticated = false
     private val bg = Color.rgb(11, 20, 28)
     private val surface = Color.rgb(24, 39, 49)
     private val green = Color.rgb(190, 242, 115)
@@ -34,10 +38,92 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        profileStore = LocalProfileStore(this)
+        if (profileStore.exists()) showUnlockScreen() else showProfileSetupScreen()
+    }
+
+
+    private fun gateBase(titleText: String, subtitle: String): LinearLayout {
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setBackgroundColor(bg)
+            setPadding(dp(26), dp(36), dp(26), dp(28))
+        }
+        page.addView(label("LEAFBRIDGE", 28f, white, true))
+        page.addView(label("LEAFVIBE  •  ESPACE LOCAL", 12f, green, true))
+        page.addView(View(this), LinearLayout.LayoutParams(1, dp(34)))
+        page.addView(label(titleText, 25f, white, true))
+        page.addView(label(subtitle, 14f, muted))
+        return page
+    }
+
+    private fun gateInput(hintText: String, numeric: Boolean = false): EditText =
+        EditText(this).apply {
+            hint = hintText
+            textSize = 16f
+            setTextColor(white)
+            setHintTextColor(muted)
+            inputType = if (numeric) InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            background = shape(Color.rgb(31, 48, 59), 14)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+
+    private fun showProfileSetupScreen() {
+        authenticated = false
+        val page = gateBase("Créer ton profil", "Un profil privé, enregistré uniquement sur cet appareil.")
+        val name = gateInput("Nom du profil")
+        val pin = gateInput("Code PIN à 6 chiffres minimum", true)
+        val confirm = gateInput("Confirmer le code PIN", true)
+        page.addView(name, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(22) })
+        page.addView(pin, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(12) })
+        page.addView(confirm, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(12) })
+        page.addView(label("Le code n'est pas stocké en clair. Le profil reste disponible hors ligne.", 12f, muted))
+        page.addView(button("Créer mon espace LeafVibe", true) {
+            val p = pin.text.toString().toCharArray()
+            if (name.text.toString().isBlank()) {
+                Toast.makeText(this, "Choisis un nom de profil.", Toast.LENGTH_SHORT).show()
+            } else if (p.size < 6 || p.any { !it.isDigit() }) {
+                Toast.makeText(this, "Le code doit contenir au moins 6 chiffres.", Toast.LENGTH_SHORT).show()
+            } else if (String(p) != confirm.text.toString()) {
+                Toast.makeText(this, "Les deux codes ne correspondent pas.", Toast.LENGTH_SHORT).show()
+            } else if (profileStore.create(name.text.toString(), p)) {
+                p.fill('\u0000')
+                authenticated = true
+                openWorkspace()
+            } else {
+                p.fill('\u0000')
+                Toast.makeText(this, "Impossible de créer le profil local.", Toast.LENGTH_LONG).show()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(22) })
+        page.addView(label("Aucun compte en ligne n'est nécessaire.", 12f, muted))
+        setContentView(ScrollView(this).apply { addView(page) })
+    }
+
+    private fun showUnlockScreen() {
+        authenticated = false
+        val page = gateBase("Bon retour, " + profileStore.profileName(), "Déverrouille ton espace LeafVibe pour continuer.")
+        val pin = gateInput("Ton code PIN", true)
+        page.addView(pin, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(24) })
+        page.addView(button("Déverrouiller", true) {
+            val value = pin.text.toString().toCharArray()
+            val valid = profileStore.verify(value)
+            value.fill('\u0000')
+            pin.text.clear()
+            if (valid) { authenticated = true; openWorkspace() }
+            else Toast.makeText(this, "Code incorrect. Réessaie.", Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(16) })
+        page.addView(label("Mode hors ligne · Profil enregistré sur cet appareil", 12f, muted))
+        setContentView(ScrollView(this).apply { addView(page) })
+    }
+
+    private fun openWorkspace() {
         buildShell()
         navigate("Accueil")
         refreshEngine()
     }
+
+    private fun lockWorkspace() { authenticated = false; showUnlockScreen() }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -305,6 +391,12 @@ class MainActivity : Activity() {
                 addView(label("•  $it", 13f, white))
             }
             addView(label("Aucun mot de passe ne doit être demandé directement dans LeafBridge.", 11f))
+        })
+        addPanel(panel().apply {
+            addView(label("PROFIL LOCAL", 11f, green, true))
+            addView(label(profileStore.profileName(), 16f, white, true))
+            addView(label("Ce profil fonctionne sans connexion Internet.", 12f))
+            addView(button("Verrouiller LeafBridge", false) { lockWorkspace() })
         })
         addPanel(panel().apply {
             addView(label("MOTEUR LOCAL", 11f, green, true))
