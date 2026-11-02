@@ -87,11 +87,12 @@ class LeafHomeActivity : Activity() {
         brand.addView(text("LEAFVIBE", 22f, fg(), true))
         brand.addView(text("ANDROID DESKTOP  •  BUREAU ${page + 1}/3", 10f, muted(), true))
         top.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(button("LeafBridge") { startActivity(Intent(this, MainActivity::class.java)) })
         top.addView(button("⌕ Apps", ::renderDrawer))
         top.addView(button("⚙", ::renderSettings))
         root.addView(top)
         val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for (p in 0..2) pages.addView(buildPage(p), LinearLayout.LayoutParams(resources.displayMetrics.widthPixels - dp(32), 0, 1f))
+        for (p in 0..2) pages.addView(buildPage(p), LinearLayout.LayoutParams(resources.displayMetrics.widthPixels - dp(32), -1))
         val horizontal = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(pages)
@@ -116,6 +117,7 @@ class LeafHomeActivity : Activity() {
             setOnClickListener { page = p; horizontal.smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0); updatePageIndicator() }
         })
         root.addView(indicator)
+        root.addView(button("▣  Fenêtres Android  ·  multitâche") { Toast.makeText(this, "Balaye vers le haut et maintiens pour afficher les applications récentes Android.", Toast.LENGTH_LONG).show() })
         val dockPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; background = shape(panelColor(), 22)
             setPadding(dp(10), dp(8), dp(10), dp(8))
