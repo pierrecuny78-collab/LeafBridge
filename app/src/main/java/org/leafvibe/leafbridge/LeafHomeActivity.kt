@@ -366,6 +366,7 @@ class LeafHomeActivity : Activity() {
         pageView.addView(button("Retour au bureau 1") { page = 0; renderDesktop() })
         pageView.addView(button("Retour au bureau 2") { page = 1; renderDesktop() })
         pageView.addView(button("Retour au bureau 3") { page = 2; renderDesktop() })
+        pageView.addView(button("Retour au bureau 4") { page = 3; renderDesktop() })
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         pageView.addView(button("← Retour") { renderDesktop() })
         setContentView(ScrollView(this).apply { addView(pageView) })
