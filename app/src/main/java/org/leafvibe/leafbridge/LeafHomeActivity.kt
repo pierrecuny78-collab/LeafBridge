@@ -238,7 +238,11 @@ class LeafHomeActivity : Activity() {
                 false
             }
         }
-        root.addView(horizontal, LinearLayout.LayoutParams(-1, 0, 1f))
+        val desktopRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        desktopRow.addView(button("◧") { renderWidgetPanel("left") }, LinearLayout.LayoutParams(dp(34), -1))
+        desktopRow.addView(horizontal, LinearLayout.LayoutParams(0, -1, 1f))
+        desktopRow.addView(button("◨") { renderWidgetPanel("right") }, LinearLayout.LayoutParams(dp(34), -1))
+        root.addView(desktopRow, LinearLayout.LayoutParams(-1, 0, 1f))
         val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER; tag = "page_indicator" }
         for (p in 0..3) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
@@ -358,6 +362,55 @@ class LeafHomeActivity : Activity() {
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         pageView.addView(button("＋ Personnaliser cet espace", ::renderSettings))
         return ScrollView(this).apply { isFillViewport = true; addView(pageView) }
+    }
+
+    private fun renderWidgetPanel(side: String) {
+        val left = side == "left"
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(24), dp(18), dp(16))
+            setBackgroundColor(bg())
+        }
+        page.addView(text(if (left) "Widgets · Vie privée" else "Widgets · Organisation", 25f, fg(), true))
+        page.addView(text(if (left) "Panneau latéral gauche" else "Panneau latéral droit", 12f, muted()))
+        fun widget(title: String, detail: String, action: (() -> Unit)? = null) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = shape(panelColor(), 18)
+                setPadding(dp(15), dp(13), dp(15), dp(13))
+                if (action != null) setOnClickListener { action() }
+            }
+            card.addView(text(title, 17f, fg(), true))
+            card.addView(text(detail, 13f, muted()))
+            page.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10); topMargin = dp(4) })
+        }
+        if (left) {
+            val now = java.text.SimpleDateFormat("EEEE d MMMM · HH:mm", java.util.Locale.FRANCE).format(java.util.Date())
+            widget("Horloge & date", now)
+            val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            widget("Batterie", if (battery in 0..100) "$battery %" else "État indisponible")
+            widget("Espace privé", "Médias, fichiers et communications") {
+                category = "Privé"; renderDrawer()
+            }
+            widget("Sécurité", "Protection PIN locale activée")
+        } else {
+            widget("Organisation", "Agenda, tâches et planification") {
+                category = "Organisation"; renderDrawer()
+            }
+            widget("Routines", "Centre de contrôle LeafBridge") {
+                startActivity(Intent(this, MainActivity::class.java))
+            }
+            widget("Habitudes & tracker", "Outils de suivi et de régularité") {
+                category = "Outils"; renderDrawer()
+            }
+            widget("Périphériques", "Téléphone, montre, ordinateur et USB") { renderDeviceModes() }
+            widget("Bibliothèque d'extensions", "Gérer les outils de ton espace") {
+                startActivity(Intent(this, ExtensionLibraryActivity::class.java))
+            }
+        }
+        page.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        page.addView(button("← Retour au bureau") { renderDesktop() })
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(page) })
     }
 
     private fun openMatchingApp(term: String) {
