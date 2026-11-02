@@ -8,6 +8,10 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".ExtensionLibraryActivity"
+            android:exported="false"
+            android:label="Bibliothèque LeafVibe" />
+        <activity
             android:name=".MainActivity"
             android:exported="true" />
         <activity
