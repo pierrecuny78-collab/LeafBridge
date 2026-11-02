@@ -232,6 +232,8 @@ class MainActivity : Activity() {
                 displayActiveTab()
             }
         })
+        tabControls.addView(action("Fermer") { closeActiveTab() })
+        tabControls.addView(action("Actualiser") { if (webViews.isNotEmpty()) webViews[activeTab].reload() })
         tabControls.addView(action("←") { if (webViews.isNotEmpty() && webViews[activeTab].canGoBack()) webViews[activeTab].goBack() })
         content.addView(tabControls)
         webHost = LinearLayout(this).apply {
@@ -249,7 +251,16 @@ class MainActivity : Activity() {
         view.settings.allowFileAccess = false
         view.settings.allowContentAccess = false
         view.settings.javaScriptCanOpenWindowsAutomatically = false
-        view.webViewClient = WebViewClient()
+        view.settings.setSupportMultipleWindows(false)
+        view.settings.allowFileAccessFromFileURLs = false
+        view.settings.allowUniversalAccessFromFileURLs = false
+        view.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(webView: WebView, url: String) {
+                if (webViews.getOrNull(activeTab) === webView && ::addressBar.isInitialized) {
+                    addressBar.setText(url)
+                }
+            }
+        }
         view.webChromeClient = WebChromeClient()
         webViews.add(view)
         activeTab = webViews.lastIndex
@@ -259,9 +270,25 @@ class MainActivity : Activity() {
 
     private fun displayActiveTab() {
         if (!::webHost.isInitialized || webViews.isEmpty()) return
+        activeTab = activeTab.coerceIn(0, webViews.lastIndex)
         webHost.removeAllViews()
         webHost.addView(webViews[activeTab], LinearLayout.LayoutParams(-1, -1))
         if (::addressBar.isInitialized) addressBar.setText(webViews[activeTab].url ?: "")
+    }
+
+    private fun closeActiveTab() {
+        if (webViews.isEmpty()) return
+        val removed = webViews.removeAt(activeTab)
+        webHost.removeView(removed)
+        removed.stopLoading()
+        removed.destroy()
+        if (webViews.isEmpty()) {
+            activeTab = 0
+            addTab("https://www.google.com")
+        } else {
+            activeTab = (activeTab - 1).coerceAtLeast(0)
+            displayActiveTab()
+        }
     }
 
     private fun loadAddress() {
