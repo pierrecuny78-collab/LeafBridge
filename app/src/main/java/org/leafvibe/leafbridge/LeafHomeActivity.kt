@@ -92,7 +92,7 @@ class LeafHomeActivity : Activity() {
         top.addView(button("⚙", ::renderSettings))
         root.addView(top)
         val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for (p in 0..2) pages.addView(buildPage(p), LinearLayout.LayoutParams(resources.displayMetrics.widthPixels - dp(32), -1))
+        for (p in 0..3) pages.addView(buildPage(p), LinearLayout.LayoutParams(resources.displayMetrics.widthPixels - dp(32), -1))
         val horizontal = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(pages)
@@ -102,7 +102,7 @@ class LeafHomeActivity : Activity() {
                 if (event.action == MotionEvent.ACTION_UP) {
                     val dx = event.x - downX
                     if (abs(dx) > dp(55)) {
-                        page = (page + if (dx < 0) 1 else -1).coerceIn(0, 2)
+                        page = (page + if (dx < 0) 1 else -1).coerceIn(0, 3)
                         smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0)
                         updatePageIndicator()
                     }
@@ -112,7 +112,7 @@ class LeafHomeActivity : Activity() {
         }
         root.addView(horizontal, LinearLayout.LayoutParams(-1, 0, 1f))
         val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER; tag = "page_indicator" }
-        for (p in 0..2) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
+        for (p in 0..3) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
             setOnClickListener { page = p; horizontal.smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0); updatePageIndicator() }
         })
@@ -131,27 +131,134 @@ class LeafHomeActivity : Activity() {
     }
 
     private fun buildPage(index: Int): View {
-        val pageView = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(4), dp(24), dp(4), dp(12)) }
-        val title = when (index) { 0 -> "Mon bureau"; 1 -> "Travail & projets"; else -> "Médias & outils" }
-        pageView.addView(text(title, 18f, fg(), true))
-        pageView.addView(text("Maintiens une application pour l'ajouter au dock.", 11f, muted()))
-        val chosen = when(index) {
-            0 -> apps.take(8)
-            1 -> apps.filter { appName(it).contains(Regex("file|drive|office|github|termux|code|note", RegexOption.IGNORE_CASE)) }.take(8)
-            else -> apps.filter { appName(it).contains(Regex("music|spotify|shazam|photo|camera|video|youtube", RegexOption.IGNORE_CASE)) }.take(8)
+        val pageView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(18), dp(4), dp(12))
         }
-        val grid = GridLayout(this).apply { columnCount = 4; useDefaultMargins = false }
-        chosen.forEach { info ->
-            val tile = appTile(info, true)
-            grid.addView(tile, GridLayout.LayoutParams().apply {
-                width = (resources.displayMetrics.widthPixels - dp(64)) / 4
-                height = dp(94); setMargins(dp(2), dp(4), dp(2), dp(4))
+        val title = when (index) {
+            0 -> "Organisation"
+            1 -> "Bureau principal"
+            2 -> "Vie privée"
+            else -> "Vie professionnelle"
+        }
+        val subtitle = when (index) {
+            0 -> "Planifier • classer • suivre • retrouver"
+            1 -> "Ton point de départ LeafVibe"
+            2 -> "Espace personnel séparé du travail"
+            else -> "Espace de travail et projets"
+        }
+        pageView.addView(text(title, 21f, fg(), true))
+        pageView.addView(text(subtitle, 11f, muted()))
+        pageView.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
+
+        fun actionCard(label: String, detail: String, action: () -> Unit) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = shape(panelColor(), 16)
+                setPadding(dp(13), dp(9), dp(13), dp(9))
+                setOnClickListener { action() }
+            }
+            card.addView(text(label, 14f, fg(), true))
+            card.addView(text(detail, 10f, muted()))
+            pageView.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(7)
             })
         }
-        pageView.addView(grid)
+
+        when (index) {
+            0 -> {
+                actionCard("✓  Tâches et suivi", "Ouvrir LeafBridge et ses modules de suivi") {
+                    startActivity(Intent(this, MainActivity::class.java))
+                }
+                actionCard("▤  Documents et classement", "Créer ou importer un document dans un emplacement choisi") {
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TITLE, "Nouvelle-note.txt")
+                    }
+                    try { startActivity(intent) } catch (_: Exception) {
+                        Toast.makeText(this, "Gestionnaire de fichiers indisponible", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                actionCard("▦  Planning", "Ouvrir le calendrier Android") {
+                    try { startActivity(Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CALENDAR")) }
+                    catch (_: Exception) { Toast.makeText(this, "Aucun calendrier disponible", Toast.LENGTH_SHORT).show() }
+                }
+                actionCard("⌕  Applications d'organisation", "Fichiers, notes, agenda, tâches et outils") {
+                    category = "Outils"; renderDrawer()
+                }
+            }
+            1 -> {
+                actionCard("LeafBridge  •  Centre de contrôle", "Automatisations, bibliothèque, Shazam et journal") {
+                    startActivity(Intent(this, MainActivity::class.java))
+                }
+                actionCard("Applications", "Rechercher toutes les applications installées") { renderDrawer() }
+                actionCard("Personnaliser", "Thèmes, fond d'écran et bureaux") { renderSettings() }
+                actionCard("Ajouter un raccourci", "Choisir une application dans le tiroir puis la maintenir pour l'épingler au dock") {
+                    renderDrawer()
+                }
+            }
+            2 -> {
+                actionCard("Photos et fichiers personnels", "Ouvrir le sélecteur Android sans donner accès global aux fichiers") {
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                    }
+                    startActivity(intent)
+                }
+                actionCard("Agenda personnel", "Accéder à ton calendrier personnel") {
+                    try { startActivity(Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CALENDAR")) }
+                    catch (_: Exception) { renderDrawer() }
+                }
+                actionCard("Communication privée", "Messages, téléphone et contacts installés") {
+                    category = "Communication"; renderDrawer()
+                }
+                actionCard("Médias", "Musique, photos, vidéo et Shazam") {
+                    category = "Médias"; renderDrawer()
+                }
+            }
+            else -> {
+                actionCard("Projets LeafVibe", "Ouvrir le centre LeafBridge et les modules") {
+                    startActivity(Intent(this, MainActivity::class.java))
+                }
+                actionCard("Créer un fichier de travail", "Choisir le dossier et le nom du document") {
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                        putExtra(Intent.EXTRA_TITLE, "Nouveau-document")
+                    }
+                    startActivity(intent)
+                }
+                actionCard("Outils professionnels", "Bureautique, développement, fichiers et communication") {
+                    category = "Outils"; renderDrawer()
+                }
+                actionCard("Communication professionnelle", "Ouvrir les applications de messagerie disponibles") {
+                    category = "Communication"; renderDrawer()
+                }
+            }
+        }
+
+        val suggestions = when (index) {
+            0 -> apps.filter { appName(it).contains(Regex("calendar|agenda|task|todo|note|keep|file|drive", RegexOption.IGNORE_CASE)) }
+            1 -> apps.take(8)
+            2 -> apps.filter { appName(it).contains(Regex("photo|camera|gallery|music|spotify|shazam|message", RegexOption.IGNORE_CASE)) }
+            else -> apps.filter { appName(it).contains(Regex("office|excel|word|github|termux|code|mail|drive", RegexOption.IGNORE_CASE)) }
+        }.take(8)
+        if (suggestions.isNotEmpty()) {
+            pageView.addView(text("RACCOURCIS D'APPLICATIONS", 10f, accent, true).apply {
+                setPadding(0, dp(8), 0, dp(6))
+            })
+            val grid = GridLayout(this).apply { columnCount = 4 }
+            suggestions.forEach { info ->
+                grid.addView(appTile(info, true), GridLayout.LayoutParams().apply {
+                    width = (resources.displayMetrics.widthPixels - dp(64)) / 4
+                    height = dp(88)
+                    setMargins(dp(2), dp(3), dp(2), dp(3))
+                })
+            }
+            pageView.addView(grid)
+        }
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
-        pageView.addView(button("＋ Personnaliser le bureau", ::renderSettings))
-        return pageView
+        pageView.addView(button("＋ Personnaliser cet espace", ::renderSettings))
+        return ScrollView(this).apply { isFillViewport = true; addView(pageView) }
     }
 
     private fun appTile(info: ApplicationInfo, canPin: Boolean): View {
@@ -285,7 +392,7 @@ class LeafHomeActivity : Activity() {
     private fun updatePageIndicator() {
         val indicator = root.findViewWithTag<LinearLayout>("page_indicator") ?: return
         indicator.removeAllViews()
-        for (p in 0..2) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
+        for (p in 0..3) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
             setOnClickListener { this@LeafHomeActivity.page = p; renderDesktop() }
         })
