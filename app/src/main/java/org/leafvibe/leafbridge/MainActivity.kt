@@ -1,20 +1,16 @@
 package org.leafvibe.leafbridge
 
 import android.app.Activity
-import android.app.NotificationManager
-import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -22,62 +18,109 @@ import android.widget.Toast
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val executor = Executors.newSingleThreadExecutor()
+    private val io = Executors.newSingleThreadExecutor()
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
-    private lateinit var status: TextView
-    private lateinit var browser: LinearLayout
-    private lateinit var addressBar: EditText
-    private lateinit var webHost: LinearLayout
-    private val webViews = mutableListOf<WebView>()
-    private var activeTab = 0
-    private var currentPage = "Accueil"
+    private var current = "Accueil"
+    private var engineOnline = false
+    private val bg = Color.rgb(11, 20, 28)
+    private val surface = Color.rgb(24, 39, 49)
+    private val green = Color.rgb(190, 242, 115)
+    private val muted = Color.rgb(169, 188, 198)
+    private val white = Color.WHITE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildShell()
-        showHome()
+        navigate("Accueil")
+        refreshEngine()
     }
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    private fun shape(color: Int, radius: Int = 18): GradientDrawable =
+        GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+
+    private fun label(value: String, size: Float = 14f, color: Int = muted, bold: Boolean = false): TextView =
+        TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            if (bold) setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, dp(3), 0, dp(3))
+        }
+
+    private fun panel(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = shape(surface, 20)
+        setPadding(dp(16), dp(15), dp(16), dp(15))
+    }
+
+    private fun addPanel(view: View) {
+        content.addView(view, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(12)
+        })
+    }
+
+    private fun button(title: String, primary: Boolean = false, onClick: () -> Unit): Button =
+        Button(this).apply {
+            text = title
+            isAllCaps = false
+            textSize = 13f
+            setTextColor(if (primary) Color.rgb(20, 34, 25) else white)
+            background = shape(if (primary) green else Color.rgb(42, 62, 73), 14)
+            setPadding(dp(12), dp(5), dp(12), dp(5))
+            setOnClickListener { onClick() }
+        }
 
     private fun buildShell() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(12, 20, 29))
+            setBackgroundColor(bg)
         }
-        val header = TextView(this).apply {
-            text = "LEAFBRIDGE  •  V1.1"
-            textSize = 19f
-            setTextColor(Color.WHITE)
-            setPadding(22, 20, 16, 16)
-            setBackgroundColor(Color.rgb(20, 35, 47))
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(17), dp(20), dp(14))
         }
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        brand.addView(label("LEAFBRIDGE", 19f, white, true))
+        brand.addView(label("CONTROL CENTER  •  2.0", 10f, muted, true))
+        header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("●", 13f, green, true))
+        header.addView(label(" LEAFVIBE", 11f, muted, true))
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 14, 16, 12)
+            setPadding(dp(16), dp(8), dp(16), dp(18))
         }
-        val scroll = ScrollView(this).apply { addView(content) }
+        val scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.rgb(20, 35, 47))
             gravity = Gravity.CENTER
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            setBackgroundColor(Color.rgb(17, 29, 38))
         }
-        listOf("Accueil", "Automatisations", "Web", "Connexions", "Réglages").forEach { page ->
-            val b = Button(this).apply {
-                text = when (page) {
-                    "Automatisations" -> "Auto"
-                    "Réglages" -> "Réglages"
-                    else -> page
-                }
-                textSize = 10f
-                isAllCaps = false
-                setPadding(2, 8, 2, 8)
+        listOf("Accueil", "Modules", "Musique", "Activité", "Réglages").forEach { page ->
+            val short = when (page) {
+                "Accueil" -> "⌂\nAccueil"
+                "Modules" -> "◈\nModules"
+                "Musique" -> "♫\nMusique"
+                "Activité" -> "◷\nActivité"
+                else -> "⚙\nRéglages"
+            }
+            val item = TextView(this).apply {
+                text = short
+                gravity = Gravity.CENTER
+                textSize = 11f
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setTextColor(if (page == current) green else muted)
+                setPadding(dp(2), dp(5), dp(2), dp(5))
                 setOnClickListener { navigate(page) }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            nav.addView(item, LinearLayout.LayoutParams(0, -2, 1f))
         }
         root.addView(header)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -86,275 +129,239 @@ class MainActivity : Activity() {
     }
 
     private fun navigate(page: String) {
-        currentPage = page
+        current = page
         content.removeAllViews()
         when (page) {
-            "Accueil" -> showHome()
-            "Automatisations" -> showAutomations()
-            "Web" -> showBrowser()
-            "Connexions" -> showConnections()
-            else -> showSettings()
+            "Accueil" -> home()
+            "Modules" -> modules()
+            "Musique" -> music()
+            "Activité" -> activityLog()
+            else -> settings()
         }
     }
 
-    private fun heading(value: String) = TextView(this).apply {
-        text = value
-        textSize = 23f
-        setTextColor(Color.WHITE)
-        setPadding(0, 8, 0, 12)
+    private fun title(main: String, sub: String) {
+        content.addView(label(main, 26f, white, true))
+        content.addView(label(sub, 13f, muted))
+        content.addView(View(this).apply { setBackgroundColor(Color.rgb(48, 68, 78)) },
+            LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(12); bottomMargin = dp(16) })
     }
 
-    private fun paragraph(value: String) = TextView(this).apply {
-        text = value
-        textSize = 14f
-        setTextColor(Color.rgb(205, 216, 225))
-        setPadding(0, 4, 0, 10)
-    }
-
-    private fun action(label: String, callback: () -> Unit) = Button(this).apply {
-        text = label
-        isAllCaps = false
-        setOnClickListener { callback() }
-    }
-
-    private fun card(title: String, description: String, actionLabel: String? = null, callback: (() -> Unit)? = null) {
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(14, 12, 14, 12)
-            setBackgroundColor(Color.rgb(25, 39, 52))
+    private fun home() {
+        title("Ton espace de contrôle", "Tes automatisations et ta bibliothèque, au même endroit.")
+        val hero = panel().apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(35, 67, 57), Color.rgb(24, 42, 51))).apply { cornerRadius = dp(22).toFloat() }
+            addView(label("LEAFVIBE ECOSYSTEM", 10f, green, true))
+            addView(label("La musique circule.\nTu gardes le contrôle.", 23f, white, true))
+            addView(label("Shazam  →  LeafBridge  →  Spotify / LeafMusic", 12f, muted))
+            addView(button("Gérer les modules", true) { navigate("Modules") })
         }
-        panel.addView(TextView(this).apply {
-            text = title
-            textSize = 17f
-            setTextColor(Color.WHITE)
-        })
-        panel.addView(paragraph(description))
-        if (actionLabel != null && callback != null) panel.addView(action(actionLabel, callback))
-        content.addView(panel, LinearLayout.LayoutParams(-1, -2).apply {
-            bottomMargin = 12
-        })
-    }
-
-    private fun showHome() {
-        content.addView(heading("Tableau de bord"))
-        status = paragraph("Vérification de Termux…")
-        content.addView(status)
-        card("Shazam", "Réception des notifications Shazam sur Android.", "Gérer l’accès") {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        }
-        card("Moteur Termux", "Le moteur local exécute les tâches autorisées en arrière-plan.", "Tester la connexion") {
-            checkTermux()
-        }
-        card("Accès notifications", "Autoriser LeafBridge à lire les notifications Shazam.", "Ouvrir les autorisations") {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        }
-        card("Ouvrir les automatisations", "Démarrer ou arrêter les modules depuis leurs propres boutons.", "Voir les automatisations") {
-            navigate("Automatisations")
-        }
-        refreshStatus()
-    }
-
-    private fun showAutomations() {
-        content.addView(heading("Automatisations"))
-        content.addView(paragraph("Chaque bouton envoie une commande précise au moteur local Termux. Le moteur refuse les modules qui ne sont pas encore configurés."))
-        automationCard("Shazam → Spotify", "Transmettre les titres détectés vers la file de traitement Spotify.", "shazam_spotify")
-        automationCard("Synchronisation GitHub", "Préparer une synchronisation de projets et de fichiers autorisés.", "github_sync")
-        automationCard("Classement musical", "Classer les titres reçus par style et catégorie.", "music_sort")
-        automationCard("Routine LeafBridge", "Lancer les vérifications locales programmées.", "routine")
-        content.addView(action("Actualiser l'état du moteur") { refreshStatus() })
-    }
-
-    private fun automationCard(title: String, description: String, id: String) {
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(14, 12, 14, 12)
-            setBackgroundColor(Color.rgb(25, 39, 52))
-        }
-        panel.addView(TextView(this).apply {
-            text = title
-            textSize = 17f
-            setTextColor(Color.WHITE)
-        })
-        panel.addView(paragraph(description))
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        buttons.addView(action("Démarrer") { sendAutomation(id, "start") }, LinearLayout.LayoutParams(0, -2, 1f))
-        buttons.addView(action("Arrêter") { sendAutomation(id, "stop") }, LinearLayout.LayoutParams(0, -2, 1f))
-        panel.addView(buttons)
-        content.addView(panel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
-    }
-
-    private fun showConnections() {
-        content.addView(heading("Connexions"))
-        content.addView(paragraph("LeafBridge ne crée aucun compte. Chaque service sera autorisé séparément, avec ses propres permissions."))
-        listOf(
-            Triple("Spotify", "Compte musical. L'autorisation officielle sera nécessaire pour ajouter des titres aux playlists.", "https://accounts.spotify.com/"),
-            Triple("GitHub", "Dépôts, fichiers et synchronisation selon les autorisations accordées.", "https://github.com/login"),
-            Triple("Instagram", "Connexion via les mécanismes officiels et uniquement pour les fonctions permises par l'API.", "https://www.instagram.com/accounts/login/"),
-            Triple("TikTok", "Connexion officielle selon les produits et permissions API disponibles.", "https://www.tiktok.com/login")
-        ).forEach { (name, description, url) ->
-            card(name, description, "Ouvrir le service") {
-                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-            }
-        }
-    }
-
-    private fun showSettings() {
-        content.addView(heading("Réglages"))
-        content.addView(paragraph("Moteur local : http://127.0.0.1:8765. Le serveur doit être démarré dans Termux."))
-        content.addView(action("Tester Termux") { checkTermux() })
-        content.addView(action("Autoriser les notifications Shazam") {
+        addPanel(hero)
+        val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        stats.addView(statCard("MOTEUR", if (engineOnline) "En ligne" else "Hors ligne", if (engineOnline) green else Color.rgb(255, 184, 92)),
+            LinearLayout.LayoutParams(0, -2, 1f))
+        stats.addView(View(this), LinearLayout.LayoutParams(dp(10), 1))
+        stats.addView(statCard("AUTOMATISATIONS", "4 modules", green), LinearLayout.LayoutParams(0, -2, 1f))
+        addPanel(stats)
+        val quick = panel()
+        quick.addView(label("ACCÈS RAPIDE", 11f, green, true))
+        quick.addView(label("Réception Shazam", 17f, white, true))
+        quick.addView(label("Autorisation Android requise pour lire les notifications Shazam.", 12f))
+        quick.addView(button("Configurer les notifications", false) {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         })
-        content.addView(action("Ouvrir les paramètres de batterie") {
-            startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-        })
-        content.addView(paragraph("Pour une exécution durable, configure Termux:Boot et retire Termux des restrictions de batterie si Android le permet."))
+        quick.addView(label("Connexion Spotify", 17f, white, true))
+        quick.addView(label("L'autorisation Spotify officielle sera intégrée avant tout ajout automatique.", 12f))
+        quick.addView(button("Ouvrir les connexions", false) { navigate("Réglages") })
+        addPanel(quick)
+        val statusPanel = panel()
+        statusPanel.addView(label("ÉTAT DU SYSTÈME", 11f, green, true))
+        statusPanel.addView(label(if (engineOnline) "Moteur local détecté" else "Moteur local non détecté", 16f, white, true))
+        statusPanel.addView(button("Actualiser", true) { refreshEngine() })
+        addPanel(statusPanel)
     }
 
-    private fun showBrowser() {
-        content.addView(heading("Navigateur LeafBridge"))
-        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        addressBar = EditText(this).apply {
-            hint = "Adresse web ou recherche"
-            singleLine = true
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.LTGRAY)
-            setText("https://www.google.com")
-        }
-        controls.addView(addressBar, LinearLayout.LayoutParams(0, -2, 1f))
-        controls.addView(action("Aller") { loadAddress() })
-        content.addView(controls)
-        val tabControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tabControls.addView(action("Nouvel onglet +") { addTab("https://www.google.com") })
-        tabControls.addView(action("Onglet suivant") {
-            if (webViews.isNotEmpty()) {
-                activeTab = (activeTab + 1) % webViews.size
-                displayActiveTab()
-            }
-        })
-        tabControls.addView(action("Fermer") { closeActiveTab() })
-        tabControls.addView(action("Actualiser") { if (webViews.isNotEmpty()) webViews[activeTab].reload() })
-        tabControls.addView(action("←") { if (webViews.isNotEmpty() && webViews[activeTab].canGoBack()) webViews[activeTab].goBack() })
-        content.addView(tabControls)
-        webHost = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-        }
-        content.addView(webHost, LinearLayout.LayoutParams(-1, 0, 1f).apply { height = 900 })
-        if (webViews.isEmpty()) addTab("https://www.google.com") else displayActiveTab()
+    private fun statCard(name: String, value: String, accent: Int) = panel().apply {
+        addView(label(name, 10f, muted, true))
+        addView(label(value, 17f, accent, true))
     }
 
-    private fun addTab(url: String) {
-        val view = WebView(this)
-        view.settings.javaScriptEnabled = true
-        view.settings.domStorageEnabled = true
-        view.settings.allowFileAccess = false
-        view.settings.allowContentAccess = false
-        view.settings.javaScriptCanOpenWindowsAutomatically = false
-        view.settings.setSupportMultipleWindows(false)
-        view.settings.allowFileAccessFromFileURLs = false
-        view.settings.allowUniversalAccessFromFileURLs = false
-        view.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(webView: WebView, url: String) {
-                if (webViews.getOrNull(activeTab) === webView && ::addressBar.isInitialized) {
-                    addressBar.setText(url)
+    private fun modules() {
+        title("Modules", "Active, configure et surveille chaque fonction.")
+        module("01  SHAZAM → SPOTIFY", "Capture des titres Shazam, file d'attente et ajout aux playlists.", "shazam_spotify")
+        module("02  CLASSEMENT MUSICAL", "Organisation par genre, ambiance, artiste et playlists.", "music_sort")
+        module("03  SYNCHRONISATION GITHUB", "Synchronisation contrôlée des projets et dépôts.", "github_sync")
+        module("04  ROUTINES LEAFBRIDGE", "Contrôles périodiques et tâches locales programmées.", "routine")
+        addPanel(panel().apply {
+            addView(label("ÉTAT RÉEL DES FONCTIONS", 11f, green, true))
+            addView(label("Le moteur actuel accepte la réception Shazam. Les trois autres modules nécessitent encore leur implémentation côté moteur.", 13f, white))
+            addView(button("Actualiser le moteur", false) { refreshEngine() })
+        })
+    }
+
+    private fun module(name: String, description: String, id: String) {
+        val p = panel()
+        p.addView(label(name, 14f, green, true))
+        p.addView(label(description, 13f, white))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actions.addView(button("Démarrer", true) { sendAutomation(id, "start") },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(View(this), LinearLayout.LayoutParams(dp(8), 1))
+        actions.addView(button("Arrêter", false) { sendAutomation(id, "stop") },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        p.addView(actions)
+        addPanel(p)
+    }
+
+    private fun music() {
+        title("Bibliothèque musicale", "Ta collection locale, dédupliquée et consultable.")
+        val summary = panel()
+        summary.addView(label("COLLECTION LEAFBRIDGE", 11f, green, true))
+        summary.addView(label("Chargement de ta bibliothèque…", 14f, white))
+        summary.addView(button("Actualiser", true) { navigate("Musique") })
+        addPanel(summary)
+        request("GET", "/library", null) { ok, message, json ->
+            runOnUiThread {
+                if (current != "Musique") return@runOnUiThread
+                content.removeAllViews()
+                title("Bibliothèque musicale", "Ta collection locale, dédupliquée et consultable.")
+                val tracks = json?.optJSONArray("tracks")
+                val total = json?.optInt("total", 0) ?: 0
+                val favorites = json?.optInt("favorites", 0) ?: 0
+                addPanel(panel().apply {
+                    addView(label("VUE D'ENSEMBLE", 11f, green, true))
+                    addView(label("$total titre(s) enregistré(s)", 21f, white, true))
+                    addView(label("$favorites favori(s) · Stockage local Termux", 12f))
+                    addView(button("Actualiser la bibliothèque", true) { navigate("Musique") })
+                })
+                if (!ok || tracks == null) {
+                    addPanel(panel().apply { addView(label(message, 13f, white)) })
+                    return@runOnUiThread
+                }
+                if (tracks.length() == 0) {
+                    addPanel(panel().apply {
+                        addView(label("AUCUN TITRE POUR LE MOMENT", 11f, green, true))
+                        addView(label("Les notifications Shazam reçues apparaîtront automatiquement ici.", 14f, white))
+                        addView(label("Les anciennes entrées de test sont ignorées.", 12f))
+                    })
+                } else {
+                    for (i in 0 until tracks.length()) {
+                        val track = tracks.optJSONObject(i) ?: continue
+                        val id = track.optString("id")
+                        val isFavorite = track.optBoolean("favorite")
+                        addPanel(panel().apply {
+                            addView(label(track.optString("title", "Titre inconnu"), 17f, white, true))
+                            addView(label(track.optString("artist", "Artiste non renseigné"), 13f, muted))
+                            addView(label("Reçu : " + track.optString("first_seen", "Date inconnue"), 10f, muted))
+                            addView(button(if (isFavorite) "★ Retirer des favoris" else "☆ Ajouter aux favoris", isFavorite) {
+                                val body = JSONObject().put("id", id).put("favorite", !isFavorite).toString()
+                                request("POST", "/track", body) { success, result, _ ->
+                                    runOnUiThread {
+                                        Toast.makeText(this@MainActivity, result, Toast.LENGTH_SHORT).show()
+                                        if (success && current == "Musique") navigate("Musique")
+                                    }
+                                }
+                            })
+                        })
+                    }
                 }
             }
         }
-        view.webChromeClient = WebChromeClient()
-        webViews.add(view)
-        activeTab = webViews.lastIndex
-        view.loadUrl(url)
-        displayActiveTab()
     }
 
-    private fun displayActiveTab() {
-        if (!::webHost.isInitialized || webViews.isEmpty()) return
-        activeTab = activeTab.coerceIn(0, webViews.lastIndex)
-        webHost.removeAllViews()
-        webHost.addView(webViews[activeTab], LinearLayout.LayoutParams(-1, -1))
-        if (::addressBar.isInitialized) addressBar.setText(webViews[activeTab].url ?: "")
-    }
-
-    private fun closeActiveTab() {
-        if (webViews.isEmpty()) return
-        val removed = webViews.removeAt(activeTab)
-        webHost.removeView(removed)
-        removed.stopLoading()
-        removed.destroy()
-        if (webViews.isEmpty()) {
-            activeTab = 0
-            addTab("https://www.google.com")
-        } else {
-            activeTab = (activeTab - 1).coerceAtLeast(0)
-            displayActiveTab()
+    private fun activityLog() {
+        title("Journal d'activité", "Historique des opérations du moteur LeafBridge.")
+        request("GET", "/logs", null) { ok, message, json ->
+            runOnUiThread {
+                if (current != "Activité") return@runOnUiThread
+                addPanel(panel().apply {
+                    addView(label(if (ok) "JOURNAL DU MOTEUR" else "MOTEUR INDISPONIBLE", 11f, green, true))
+                    addView(label(message, 13f, white))
+                    addView(label(json?.toString(2) ?: "Aucun détail disponible.", 11f, muted))
+                    addView(button("Actualiser le journal", true) { navigate("Activité") })
+                })
+            }
         }
     }
 
-    private fun loadAddress() {
-        if (webViews.isEmpty()) addTab("https://www.google.com")
-        var target = addressBar.text.toString().trim()
-        if (target.isBlank()) return
-        if (!target.startsWith("http://") && !target.startsWith("https://")) {
-            target = if (target.contains(".") && !target.contains(" ")) "https://$target"
-                else "https://www.google.com/search?q=" + URLEncoder.encode(target, "UTF-8")
-        }
-        webViews[activeTab].loadUrl(target)
+    private fun settings() {
+        title("Réglages & connexions", "Configure les accès et le fonctionnement local.")
+        addPanel(panel().apply {
+            addView(label("AUTORISATIONS ANDROID", 11f, green, true))
+            addView(label("Accès aux notifications Shazam", 15f, white, true))
+            addView(label("Nécessaire pour récupérer les titres identifiés.", 12f))
+            addView(button("Ouvrir les autorisations", true) {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            })
+            addView(label("Optimisation batterie", 15f, white, true))
+            addView(button("Paramètres batterie", false) {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            })
+        })
+        addPanel(panel().apply {
+            addView(label("COMPTES & SERVICES", 11f, green, true))
+            listOf("Spotify — OAuth à intégrer", "GitHub — connexion à intégrer", "LeafMusic — stockage local à configurer").forEach {
+                addView(label("•  $it", 13f, white))
+            }
+            addView(label("Aucun mot de passe ne doit être demandé directement dans LeafBridge.", 11f))
+        })
+        addPanel(panel().apply {
+            addView(label("MOTEUR LOCAL", 11f, green, true))
+            addView(label("Adresse : 127.0.0.1:8765", 13f, white))
+            addView(label(if (engineOnline) "État : connecté" else "État : hors ligne", 13f))
+            addView(button("Tester la connexion", true) { refreshEngine() })
+        })
     }
 
-    private fun checkTermux() {
-        requestEngine("GET", "/status", null) { ok, message ->
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun refreshStatus() {
-        requestEngine("GET", "/status", null) { ok, message ->
-            if (::status.isInitialized) status.text = if (ok) "Moteur Termux : connecté" else "Moteur Termux : hors ligne"
+    private fun refreshEngine() {
+        request("GET", "/status", null) { ok, message, _ ->
+            runOnUiThread {
+                engineOnline = ok
+                if (current == "Accueil") navigate("Accueil")
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     private fun sendAutomation(id: String, command: String) {
-        val payload = JSONObject().put("id", id).put("command", command).toString()
-        requestEngine("POST", "/automation", payload) { ok, message ->
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        val body = JSONObject().put("id", id).put("command", command).toString()
+        request("POST", "/automation", body) { ok, message, _ ->
+            runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
         }
     }
 
-    private fun requestEngine(method: String, path: String, body: String?, done: (Boolean, String) -> Unit) {
-        executor.execute {
+    private fun request(method: String, path: String, body: String?,
+                        done: (Boolean, String, JSONObject?) -> Unit) {
+        io.execute {
             var ok = false
-            var message = "Termux inaccessible. Démarre le moteur LeafBridge dans Termux."
+            var message = "Moteur local inaccessible. Vérifie son démarrage."
+            var json: JSONObject? = null
             try {
-                val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
-                connection.requestMethod = method
-                connection.connectTimeout = 2500
-                connection.readTimeout = 2500
+                val c = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
+                c.requestMethod = method
+                c.connectTimeout = 2500
+                c.readTimeout = 2500
                 if (body != null) {
-                    connection.doOutput = true
-                    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    c.doOutput = true
+                    c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 }
-                val code = connection.responseCode
-                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                val response = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                val json = try { JSONObject(response) } catch (_: Exception) { JSONObject() }
+                val code = c.responseCode
+                val stream = if (code in 200..299) c.inputStream else c.errorStream
+                val raw = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                json = try { JSONObject(raw) } catch (_: Exception) { null }
                 ok = code in 200..299
-                message = json.optString("message", if (ok) "Termux connecté" else "Erreur moteur : HTTP $code")
-                connection.disconnect()
+                message = json?.optString("message")?.takeIf { it.isNotBlank() }
+                    ?: if (ok) "Opération réussie" else "Erreur HTTP $code"
+                c.disconnect()
             } catch (_: Exception) { }
-            runOnUiThread { done(ok, message) }
+            done(ok, message, json)
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::status.isInitialized && currentPage == "Accueil") refreshStatus()
     }
 
     override fun onDestroy() {
-        webViews.forEach { it.destroy() }
-        executor.shutdown()
+        io.shutdown()
         super.onDestroy()
     }
 }
