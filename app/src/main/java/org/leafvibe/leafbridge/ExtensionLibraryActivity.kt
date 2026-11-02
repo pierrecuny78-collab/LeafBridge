@@ -38,7 +38,7 @@ class ExtensionLibraryActivity : Activity() {
     private fun box(color:Int,radius:Int=18)=GradientDrawable().apply{setColor(color);cornerRadius=dp(radius).toFloat()}
     private fun label(value:String,size:Float,color:Int=white,bold:Boolean=false)=TextView(this).apply{text=value;textSize=size;setTextColor(color);if(bold)setTypeface(typeface,Typeface.BOLD);gravity=Gravity.CENTER_VERTICAL}
     private fun action(value:String,onClick:()->Unit)=TextView(this).apply{text=value;textSize=13f;setTextColor(white);gravity=Gravity.CENTER;setPadding(dp(12),dp(11),dp(12),dp(11));background=box(panel,13);setOnClickListener{onClick()}}
-    private fun ids(key:String):MutableSet<String>=(prefs.getStringSet(key,emptySet())?:emptySet()).toMutableSet()
+    private fun ids(key:String): MutableSet<String> =(prefs.getStringSet(key,emptySet())?:emptySet()).toMutableSet()
     private fun save(key:String,values:Set<String>){prefs.edit().putStringSet(key,values.toSet()).apply()}
     private fun installed(id:String)=id in ids("installed")
     private fun enabled(id:String)=id in ids("enabled")
@@ -76,17 +76,17 @@ class ExtensionLibraryActivity : Activity() {
     private fun card(e:Entry):View{
         val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=box(panel,17);setPadding(dp(13),dp(12),dp(13),dp(12))}
         val top=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
-        top.addView(label(e.name,16f,white,true),LinearLayout.LayoutParams(0,-2,1f));top.addView(label(if(installed(e.id))"AJOUTÉ" else if(e.installable)"DISPONIBLE" else "RÉFÉRENCE",9f,if(installed(e.id))green else muted,true));card.addView(top)
+        top.addView(label(e.name,16f,white,true),LinearLayout.LayoutParams(0,-2,1f));top.addView(label(if(installed(e.id))"DANS MA BIBLIOTHÈQUE" else if(e.installable)"FICHE AJOUTABLE" else "RÉFÉRENCE",9f,if(installed(e.id))green else muted,true));card.addView(top)
         card.addView(label(e.category.uppercase()+"  •  "+e.kind,9f,green,true))
         card.addView(label(e.description,12f,white).apply{setPadding(0,dp(7),0,dp(7))})
         card.addView(label("Source : "+e.source,10f,muted));card.addView(label("Licence : "+e.licence+"  •  "+if(e.offline)"Hors ligne possible" else "Connexion requise",10f,muted))
         card.addView(label(if(e.installable)"L'action ajoute sa fiche au registre local. Le téléchargement et l'intégration réelle du composant restent à faire." else "Projet externe : référence uniquement. Installation et compatibilité à auditer avant intégration.",10f,muted).apply{setPadding(0,dp(5),0,dp(5))})
         val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
         if(e.installable){
-            if(!installed(e.id))actions.addView(action("＋ Ajouter"){val s=ids("installed");s.add(e.id);save("installed",s);render()},LinearLayout.LayoutParams(0,-2,1f))
+            if(!installed(e.id))actions.addView(action("＋ Ajouter la fiche"){val s=ids("installed");s.add(e.id);save("installed",s);render()},LinearLayout.LayoutParams(0,-2,1f))
             else{
                 actions.addView(action(if(enabled(e.id))"Désactiver" else "Activer"){val s=ids("enabled");if(enabled(e.id))s.remove(e.id) else s.add(e.id);save("enabled",s);render()},LinearLayout.LayoutParams(0,-2,1f))
-                actions.addView(action("Retirer"){val i=ids("installed");i.remove(e.id);save("installed",i);val a=ids("enabled");a.remove(e.id);save("enabled",a);render()},LinearLayout.LayoutParams(0,-2,1f).apply{marginStart=dp(6)})
+                actions.addView(action("Retirer la fiche"){val i=ids("installed");i.remove(e.id);save("installed",i);val a=ids("enabled");a.remove(e.id);save("enabled",a);render()},LinearLayout.LayoutParams(0,-2,1f).apply{marginStart=dp(6)})
             }
         }else actions.addView(action(if(favourite(e.id))"★ Favori" else "☆ Favori"){val s=ids("favourites");if(favourite(e.id))s.remove(e.id) else s.add(e.id);save("favourites",s);render()},LinearLayout.LayoutParams(0,-2,1f))
         card.addView(actions.apply{setPadding(0,dp(8),0,0)})
