@@ -29,7 +29,7 @@ class LeafBrowserActivity : Activity() {
         top.addView(actionButton("→") { if (web.canGoForward()) web.goForward() })
         top.addView(actionButton("↻") { web.reload() })
         address = EditText(this).apply {
-            singleLine = true; hint = "Rechercher ou saisir une adresse"; textSize = 13f
+            setSingleLine(true); hint = "Rechercher ou saisir une adresse"; textSize = 13f
             setTextColor(android.graphics.Color.WHITE); setHintTextColor(android.graphics.Color.LTGRAY)
             setPadding(14, 8, 14, 8); setBackgroundColor(android.graphics.Color.rgb(36, 49, 58))
             imeOptions = EditorInfo.IME_ACTION_GO
