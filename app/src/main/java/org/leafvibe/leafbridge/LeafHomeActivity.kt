@@ -36,14 +36,27 @@ class LeafHomeActivity : Activity() {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences("leafvibe_desktop", MODE_PRIVATE)
         page = prefs.getInt("last_page", 1).coerceIn(0, 3)
-        loadApps()
         renderDesktop()
+        Thread {
+            val loaded = loadApps()
+            runOnUiThread {
+                if (!isFinishing) {
+                    apps = loaded
+                    if (!drawer) renderDesktop()
+                }
+            }
+        }.start()
     }
 
-    private fun loadApps() {
-        apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-            .filter { packageManager.getLaunchIntentForPackage(it.packageName) != null && it.packageName != packageName }
+    private fun loadApps(): List<ApplicationInfo> = try {
+        packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            .asSequence()
+            .filter { it.packageName != packageName }
+            .filter { packageManager.getLaunchIntentForPackage(it.packageName) != null }
             .sortedBy { packageManager.getApplicationLabel(it).toString().lowercase() }
+            .toList()
+    } catch (_: Exception) {
+        emptyList()
     }
 
     private fun bg(): Int = when (prefs.getString("theme", "Leaf Dark")) {
@@ -137,119 +150,87 @@ class LeafHomeActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(4), dp(18), dp(4), dp(12))
         }
-        val title = when (index) {
-            0 -> "Organisation"
-            1 -> "Bureau principal"
-            2 -> "Vie privée"
-            else -> "Vie professionnelle"
-        }
-        val subtitle = when (index) {
-            0 -> "Planifier • classer • suivre • retrouver"
-            1 -> "Ton point de départ LeafVibe"
-            2 -> "Espace personnel séparé du travail"
-            else -> "Espace de travail et projets"
-        }
-        pageView.addView(text(title, 21f, fg(), true))
-        pageView.addView(text(subtitle, 11f, muted()))
-        pageView.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
-
-        fun actionCard(label: String, detail: String, action: () -> Unit) {
-            val card = LinearLayout(this).apply {
+        fun card(label: String, detail: String, action: () -> Unit) {
+            val item = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                background = shape(panelColor(), 16)
-                setPadding(dp(13), dp(9), dp(13), dp(9))
+                background = shape(panelColor(), 18)
+                setPadding(dp(15), dp(13), dp(15), dp(13))
                 setOnClickListener { action() }
             }
-            card.addView(text(label, 14f, fg(), true))
-            card.addView(text(detail, 10f, muted()))
-            pageView.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(7)
-            })
+            item.addView(text(label, 17f, fg(), true))
+            item.addView(text(detail, 12f, muted()))
+            pageView.addView(item, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         }
-
         when (index) {
             0 -> {
-                actionCard("✓  Tâches et suivi", "Ouvrir LeafBridge et ses modules de suivi") {
-                    startActivity(Intent(this, MainActivity::class.java))
+                pageView.addView(text("Privé & professionnel", 27f, fg(), true))
+                pageView.addView(text("Deux espaces distincts, accessibles depuis le côté gauche.", 12f, muted()))
+                card("🔒  Vie privée", "Photos, fichiers personnels, communication et agenda privé") {
+                    category = "Médias"; renderDrawer()
                 }
-                actionCard("▤  Documents et classement", "Créer ou importer un document dans un emplacement choisi") {
-                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TITLE, "Nouvelle-note.txt")
-                    }
-                    try { startActivity(intent) } catch (_: Exception) {
-                        Toast.makeText(this, "Gestionnaire de fichiers indisponible", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                actionCard("▦  Planning", "Ouvrir le calendrier Android") {
-                    try { startActivity(Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CALENDAR")) }
-                    catch (_: Exception) { Toast.makeText(this, "Aucun calendrier disponible", Toast.LENGTH_SHORT).show() }
-                }
-                actionCard("⌕  Applications d'organisation", "Fichiers, notes, agenda, tâches et outils") {
+                card("💼  Vie professionnelle", "Documents, projets, bureautique et outils de travail") {
                     category = "Outils"; renderDrawer()
+                }
+                card("Ouvrir les projets LeafVibe", "Retrouver le centre de contrôle et les modules") {
+                    startActivity(Intent(this, MainActivity::class.java))
                 }
             }
             1 -> {
-                actionCard("LeafBridge  •  Centre de contrôle", "Automatisations, bibliothèque, Shazam et journal") {
-                    startActivity(Intent(this, MainActivity::class.java))
-                }
-                actionCard("▦  Bibliothèque d'extensions", "Découvrir les outils, gérer les extensions ajoutées et leur activation") {
+                pageView.addView(text("LEAFVIBE", 30f, fg(), true))
+                pageView.addView(text("TON ESPACE PERSONNEL", 12f, accent, true))
+                pageView.addView(text("Centre de périphériques", 21f, fg(), true).apply { setPadding(0, dp(12), 0, dp(8)) })
+                card("Modes de périphérique", "Téléphone • ordinateur • montre • clé USB") { renderDeviceModes() }
+                card("Partage & transferts", "Bluetooth, Wi-Fi, partage Android et périphériques USB") { renderSharing() }
+                card("Bibliothèque d'extensions", "Ouvrir le catalogue et gérer les fiches d'outils") {
                     startActivity(Intent(this, ExtensionLibraryActivity::class.java))
                 }
-                actionCard("Applications", "Rechercher toutes les applications installées") { renderDrawer() }
-                actionCard("Personnaliser", "Thèmes, fond d'écran et bureaux") { renderSettings() }
-                actionCard("Ajouter un raccourci", "Choisir une application dans le tiroir puis la maintenir pour l'épingler au dock") {
-                    renderDrawer()
+                card("Réglages LeafVibe", "Thèmes, fond d'écran et préférences du bureau") { renderSettings() }
+                card("Centre de contrôle LeafBridge", "Automatisations, musique, journal et modules") {
+                    startActivity(Intent(this, MainActivity::class.java))
                 }
             }
             2 -> {
-                actionCard("Photos et fichiers personnels", "Ouvrir le sélecteur Android sans donner accès global aux fichiers") {
-                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
-                    }
-                    startActivity(intent)
-                }
-                actionCard("Agenda personnel", "Accéder à ton calendrier personnel") {
+                pageView.addView(text("Organisation", 28f, fg(), true))
+                pageView.addView(text("Le côté droit : planifier, suivre et construire tes habitudes.", 12f, muted()))
+                card("Planning & tâches", "Agenda, listes et organisation quotidienne") {
                     try { startActivity(Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CALENDAR")) }
-                    catch (_: Exception) { renderDrawer() }
+                    catch (_: Exception) { category = "Outils"; renderDrawer() }
                 }
-                actionCard("Communication privée", "Messages, téléphone et contacts installés") {
-                    category = "Communication"; renderDrawer()
+                card("Routines", "Automatisations et contrôles périodiques LeafBridge") {
+                    startActivity(Intent(this, MainActivity::class.java))
                 }
-                actionCard("Médias", "Musique, photos, vidéo et Shazam") {
-                    category = "Médias"; renderDrawer()
+                card("Habitudes", "Accéder aux outils de suivi et de régularité") { category = "Outils"; renderDrawer() }
+                card("Tracker", "Suivi personnel, activité et progression") { category = "Outils"; renderDrawer() }
+                card("Applications d'organisation", "Toutes les applications de planification et de suivi") {
+                    category = "Outils"; renderDrawer()
                 }
             }
             else -> {
-                actionCard("Projets LeafVibe", "Ouvrir le centre LeafBridge et les modules") {
-                    startActivity(Intent(this, MainActivity::class.java))
+                pageView.addView(text("Santé & périphériques", 26f, fg(), true))
+                pageView.addView(text("Accès rapide aux appareils et services compatibles.", 12f, muted()))
+                card("Samsung Health", "Rechercher et ouvrir Samsung Health si installé") {
+                    openMatchingApp("health")
                 }
-                actionCard("Créer un fichier de travail", "Choisir le dossier et le nom du document") {
-                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
-                        putExtra(Intent.EXTRA_TITLE, "Nouveau-document")
-                    }
-                    startActivity(intent)
+                card("Samsung Wearable", "Rechercher et ouvrir Samsung Wearable si installé") {
+                    openMatchingApp("wear")
                 }
-                actionCard("Outils professionnels", "Bureautique, développement, fichiers et communication") {
-                    category = "Outils"; renderDrawer()
+                card("Téléphone & appareils connectés", "Voir les réglages Bluetooth et les connexions") {
+                    openBluetoothSettings()
                 }
-                actionCard("Communication professionnelle", "Ouvrir les applications de messagerie disponibles") {
-                    category = "Communication"; renderDrawer()
+                card("Clés USB & stockage externe", "Ouvrir le sélecteur Android pour parcourir un support") {
+                    openUsbPicker()
                 }
             }
         }
-
         val suggestions = when (index) {
-            0 -> apps.filter { appName(it).contains(Regex("calendar|agenda|task|todo|note|keep|file|drive", RegexOption.IGNORE_CASE)) }
+            0 -> apps.filter { appName(it).contains(Regex("photo|camera|gallery|message|mail|office|word|excel", RegexOption.IGNORE_CASE)) }
             1 -> apps.take(8)
-            2 -> apps.filter { appName(it).contains(Regex("photo|camera|gallery|music|spotify|shazam|message", RegexOption.IGNORE_CASE)) }
-            else -> apps.filter { appName(it).contains(Regex("office|excel|word|github|termux|code|mail|drive", RegexOption.IGNORE_CASE)) }
+            2 -> apps.filter { appName(it).contains(Regex("calendar|agenda|task|todo|note|keep|clock|health", RegexOption.IGNORE_CASE)) }
+            else -> apps.filter { appName(it).contains(Regex("health|wear|watch|bluetooth|files", RegexOption.IGNORE_CASE)) }
         }.take(8)
         if (suggestions.isNotEmpty()) {
-            pageView.addView(text("RACCOURCIS D'APPLICATIONS", 10f, accent, true).apply {
-                setPadding(0, dp(8), 0, dp(6))
+            pageView.addView(text("APPLICATIONS SUGGÉRÉES", 11f, accent, true).apply {
+                setPadding(0, dp(10), 0, dp(6))
             })
             val grid = GridLayout(this).apply { columnCount = 4 }
             suggestions.forEach { info ->
@@ -264,6 +245,54 @@ class LeafHomeActivity : Activity() {
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         pageView.addView(button("＋ Personnaliser cet espace", ::renderSettings))
         return ScrollView(this).apply { isFillViewport = true; addView(pageView) }
+    }
+
+    private fun openMatchingApp(term: String) {
+        val match = apps.firstOrNull { appName(it).contains(term, true) }
+        if (match != null) launch(match)
+        else Toast.makeText(this, "Application non trouvée. Vérifie qu'elle est installée.", Toast.LENGTH_LONG).show()
+    }
+
+    private fun renderDeviceModes() {
+        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(24), dp(18), dp(16)); setBackgroundColor(bg()) }
+        page.addView(text("Modes de périphérique", 25f, fg(), true))
+        listOf("Téléphone" to "Interface mobile LeafVibe", "Ordinateur" to "Préparer la continuité avec LeafCore", "Montre" to "Services compatibles Samsung Wear", "Clé USB" to "Stockage et modules portables").forEach { (name, detail) ->
+            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = shape(panelColor(), 16); setPadding(dp(14), dp(12), dp(14), dp(12)) }
+            item.addView(text(name, 18f, fg(), true)); item.addView(text(detail, 12f, muted()))
+            page.addView(item, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        }
+        page.addView(button("Réglages Android des appareils") { openBluetoothSettings() })
+        page.addView(button("← Retour au bureau") { renderDesktop() })
+        setContentView(ScrollView(this).apply { addView(page) })
+    }
+
+    private fun renderSharing() {
+        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(24), dp(18), dp(16)); setBackgroundColor(bg()) }
+        page.addView(text("Partage & transferts", 25f, fg(), true))
+        page.addView(text("LeafVibe utilise les panneaux et sélecteurs Android officiels : aucune connexion n'est activée sans ton choix.", 12f, muted()))
+        page.addView(button("Bluetooth") { openBluetoothSettings() })
+        page.addView(button("Wi-Fi & partage de connexion") {
+            try { startActivity(Intent(android.provider.Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) }
+            catch (_: Exception) { startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) }
+        })
+        page.addView(button("Partager un élément…") {
+            val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Partagé depuis LeafVibe") }
+            startActivity(Intent.createChooser(send, "Partager avec"))
+        })
+        page.addView(button("Parcourir une clé USB / un dossier") { openUsbPicker() })
+        page.addView(button("← Retour au bureau") { renderDesktop() })
+        setContentView(ScrollView(this).apply { addView(page) })
+    }
+
+    private fun openBluetoothSettings() {
+        try { startActivity(Intent(android.provider.Settings.Panel.ACTION_BLUETOOTH)) }
+        catch (_: Exception) { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
+    }
+
+    private fun openUsbPicker() {
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        try { startActivity(pick) }
+        catch (_: Exception) { Toast.makeText(this, "Sélecteur de stockage indisponible", Toast.LENGTH_SHORT).show() }
     }
 
     private fun appTile(info: ApplicationInfo, canPin: Boolean): View {
