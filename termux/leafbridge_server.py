@@ -230,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
                 favorites.discard(track_id)
             DATA.mkdir(parents=True, exist_ok=True)
             temporary = FAVORITES_FILE.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(sorted(favorites), ensure_ascii=False) + "\\n", encoding="utf-8")
+            temporary.write_text(json.dumps(sorted(favorites), ensure_ascii=False) + "\n", encoding="utf-8")
             os.replace(temporary, FAVORITES_FILE)
             log("track_favorite", {"id": track_id, "favorite": favorite})
             self.reply(200, {"ok": True, "message": "Favori mis à jour", "id": track_id, "favorite": favorite})
