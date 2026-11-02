@@ -194,6 +194,9 @@ class LeafHomeActivity : Activity() {
                 actionCard("LeafBridge  •  Centre de contrôle", "Automatisations, bibliothèque, Shazam et journal") {
                     startActivity(Intent(this, MainActivity::class.java))
                 }
+                actionCard("▦  Bibliothèque d'extensions", "Découvrir les outils, gérer les extensions ajoutées et leur activation") {
+                    startActivity(Intent(this, ExtensionLibraryActivity::class.java))
+                }
                 actionCard("Applications", "Rechercher toutes les applications installées") { renderDrawer() }
                 actionCard("Personnaliser", "Thèmes, fond d'écran et bureaux") { renderSettings() }
                 actionCard("Ajouter un raccourci", "Choisir une application dans le tiroir puis la maintenir pour l'épingler au dock") {
