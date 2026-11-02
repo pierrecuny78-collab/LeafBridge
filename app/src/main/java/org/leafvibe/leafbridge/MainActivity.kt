@@ -2,6 +2,7 @@ package org.leafvibe.leafbridge
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -30,6 +31,8 @@ class MainActivity : Activity() {
     private var engineOnline = false
     private lateinit var profileStore: LocalProfileStore
     private var authenticated = false
+    private val backupCreateRequest = 8101
+    private val backupOpenRequest = 8102
     private val bg = Color.rgb(11, 20, 28)
     private val surface = Color.rgb(24, 39, 49)
     private val green = Color.rgb(190, 242, 115)
@@ -399,6 +402,22 @@ class MainActivity : Activity() {
             addView(button("Verrouiller LeafBridge", false) { lockWorkspace() })
         })
         addPanel(panel().apply {
+            addView(label("STOCKAGE & PORTABILITÉ", 11f, green, true))
+            addView(label("Sauvegarder ou transférer ton espace", 17f, white, true))
+            addView(label("Crée une archive ZIP avec les titres Shazam, les favoris, les automatisations et le journal. Tu peux la placer dans Téléchargements, sur une clé USB ou dans un espace cloud.", 12f))
+            addView(button("Exporter une sauvegarde ZIP", true) { startBackupExport() })
+            addView(button("Importer une sauvegarde ZIP", false) { startBackupImport() })
+            addView(label("Le code PIN n'est jamais inclus : crée un nouveau profil sur le nouvel appareil.", 11f, muted))
+        })
+        addPanel(panel().apply {
+            addView(label("PROJETS & ÉDITION EXTERNE", 11f, green, true))
+            addView(label("Le dépôt complet LeafBridge", 16f, white, true))
+            addView(label("Le code source et les fichiers de développement restent dans le dépôt GitHub. Ouvre-le depuis un ordinateur pour modifier les fichiers, puis récupère les mises à jour.", 12f))
+            addView(button("Ouvrir le projet GitHub", false) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/pierrecuny78-collab/LeafBridge")))
+            })
+        })
+        addPanel(panel().apply {
             addView(label("MOTEUR LOCAL", 11f, green, true))
             addView(label("Adresse : 127.0.0.1:8765", 13f, white))
             addView(label(if (engineOnline) "État : connecté" else "État : hors ligne", 13f))
@@ -449,6 +468,48 @@ class MainActivity : Activity() {
                 c.disconnect()
             } catch (_: Exception) { }
             done(ok, message, json)
+        }
+    }
+
+
+    private fun startBackupExport() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+            putExtra(Intent.EXTRA_TITLE, "LeafBridge-backup.zip")
+        }
+        startActivityForResult(intent, backupCreateRequest)
+    }
+
+    private fun startBackupImport() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivityForResult(intent, backupOpenRequest)
+    }
+
+    @Deprecated("Uses the system document picker for broad Android compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        when (requestCode) {
+            backupCreateRequest -> WorkspaceBackup.export(this, uri) { ok, message ->
+                runOnUiThread {
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            }
+            backupOpenRequest -> {
+                Toast.makeText(this, "Restauration en cours…", Toast.LENGTH_SHORT).show()
+                WorkspaceBackup.restore(this, uri) { ok, message ->
+                    runOnUiThread {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        if (ok && current == "Musique") navigate("Musique")
+                    }
+                }
+            }
         }
     }
 
