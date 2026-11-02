@@ -141,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(raw_length)
         except (TypeError, ValueError):
             raise ValueError("Longueur de requête invalide")
-        if length < 1 or length > 65536:
+        if length < 1 or length > 32 * 1024 * 1024:
             raise ValueError("Taille JSON invalide")
         value = json.loads(self.rfile.read(length).decode("utf-8"))
         if not isinstance(value, dict):
@@ -174,6 +174,25 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if self.path == "/backup":
+            import base64
+            DATA.mkdir(parents=True, exist_ok=True)
+            files = {}
+            for key, path in {
+                "shazam-inbox.jsonl": INBOX,
+                "favorites.json": FAVORITES_FILE,
+                "automations.json": STATE_FILE,
+                "engine.log": LOG,
+            }.items():
+                if path.exists() and path.is_file():
+                    files[key] = base64.b64encode(path.read_bytes()).decode("ascii")
+            self.reply(200, {
+                "ok": True, "format": "leafbridge-backup-v1",
+                "created_at": now(), "files": files,
+                "message": "Sauvegarde locale prête",
+            })
+            return
+
         if self.path == "/logs":
             DATA.mkdir(parents=True, exist_ok=True)
             with LOCK:
@@ -194,6 +213,58 @@ class Handler(BaseHTTPRequestHandler):
             data = self.read_json()
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             self.reply(400, {"ok": False, "message": f"JSON invalide : {exc}"})
+            return
+
+        if self.path == "/restore":
+            import base64
+            import binascii
+            files = data.get("files")
+            allowed = {
+                "shazam-inbox.jsonl": INBOX,
+                "favorites.json": FAVORITES_FILE,
+                "automations.json": STATE_FILE,
+                "engine.log": LOG,
+            }
+            if data.get("format") != "leafbridge-backup-v1" or not isinstance(files, dict):
+                self.reply(400, {"ok": False, "message": "Format de sauvegarde non reconnu"})
+                return
+            if len(files) > len(allowed) or any(name not in allowed for name in files):
+                self.reply(400, {"ok": False, "message": "La sauvegarde contient des fichiers non autorisés"})
+                return
+            decoded = {}
+            try:
+                for name, encoded in files.items():
+                    if not isinstance(encoded, str):
+                        raise ValueError("Contenu de fichier invalide")
+                    raw = base64.b64decode(encoded, validate=True)
+                    if len(raw) > 20 * 1024 * 1024:
+                        raise ValueError("Un fichier dépasse la taille maximale")
+                    decoded[name] = raw
+                if "automations.json" in decoded:
+                    saved = json.loads(decoded["automations.json"].decode("utf-8"))
+                    if not isinstance(saved, dict):
+                        raise ValueError("Configuration des modules invalide")
+                if "favorites.json" in decoded:
+                    saved = json.loads(decoded["favorites.json"].decode("utf-8"))
+                    if not isinstance(saved, list):
+                        raise ValueError("Favoris invalides")
+            except (ValueError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error) as exc:
+                self.reply(400, {"ok": False, "message": f"Sauvegarde invalide : {exc}"})
+                return
+            DATA.mkdir(parents=True, exist_ok=True)
+            with LOCK:
+                for name, raw in decoded.items():
+                    target = allowed[name]
+                    temporary = target.with_name(target.name + ".restore.tmp")
+                    temporary.write_bytes(raw)
+                    os.replace(temporary, target)
+                global AUTOMATIONS
+                AUTOMATIONS = load_automations()
+            log("backup_restored", {"files": sorted(decoded.keys())})
+            self.reply(200, {
+                "ok": True, "message": "Sauvegarde restaurée. Redémarre le moteur pour actualiser tous les modules.",
+                "restored": sorted(decoded.keys()),
+            })
             return
 
         if self.path == "/shazam":
