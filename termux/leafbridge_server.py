@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import json
 import os
+import hashlib
 import threading
 
 HOST = "127.0.0.1"
@@ -17,6 +18,7 @@ DATA = Path.home() / ".leafbridge"
 INBOX = DATA / "shazam-inbox.jsonl"
 LOG = DATA / "engine.log"
 STATE_FILE = DATA / "automations.json"
+FAVORITES_FILE = DATA / "favorites.json"
 LOCK = threading.RLock()
 
 DEFAULT_AUTOMATIONS = {
@@ -74,6 +76,45 @@ def save_automations():
     os.replace(temporary, STATE_FILE)
 
 
+
+def read_library():
+    """Construit une bibliothèque dédupliquée à partir des notifications reçues."""
+    tracks = {}
+    if INBOX.exists():
+        for line in INBOX.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(line)
+                payload = record.get("payload", {})
+                if not isinstance(payload, dict):
+                    continue
+                title = str(payload.get("title", "")).strip()
+                artist = str(payload.get("text", "")).strip()
+                package = str(payload.get("package", ""))
+                if not title or title.lower().startswith("test"):
+                    continue
+                identity = (title + "\\0" + artist).casefold()
+                track_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+                if track_id not in tracks:
+                    tracks[track_id] = {
+                        "id": track_id, "title": title[:500], "artist": artist[:1000],
+                        "first_seen": record.get("received_at", ""), "package": package,
+                        "favorite": False,
+                    }
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                continue
+    favorites = set()
+    if FAVORITES_FILE.exists():
+        try:
+            saved = json.loads(FAVORITES_FILE.read_text(encoding="utf-8"))
+            if isinstance(saved, list):
+                favorites = {str(value) for value in saved}
+        except (OSError, json.JSONDecodeError):
+            pass
+    for track in tracks.values():
+        track["favorite"] = track["id"] in favorites
+    return sorted(tracks.values(), key=lambda item: item["first_seen"], reverse=True)
+
+
 def log(event, details=None):
     DATA.mkdir(parents=True, exist_ok=True)
     entry = {"time": now(), "event": event, "details": details or {}}
@@ -123,6 +164,16 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, payload)
             return
 
+
+        if self.path == "/library":
+            tracks = read_library()
+            self.reply(200, {
+                "ok": True, "tracks": tracks, "total": len(tracks),
+                "favorites": sum(1 for track in tracks if track["favorite"]),
+                "message": "Bibliothèque locale chargée",
+            })
+            return
+
         if self.path == "/logs":
             DATA.mkdir(parents=True, exist_ok=True)
             with LOCK:
@@ -159,6 +210,30 @@ class Handler(BaseHTTPRequestHandler):
                 "text": str(data.get("text", ""))[:2000],
             })
             self.reply(200, {"ok": True, "message": "Notification Shazam enregistrée localement"})
+            return
+
+
+        if self.path == "/track":
+            track_id = data.get("id")
+            favorite = data.get("favorite")
+            if not isinstance(track_id, str) or not isinstance(favorite, bool):
+                self.reply(400, {"ok": False, "message": "Identifiant ou favori invalide"})
+                return
+            tracks = read_library()
+            if not any(track["id"] == track_id for track in tracks):
+                self.reply(404, {"ok": False, "message": "Titre introuvable"})
+                return
+            favorites = {track["id"] for track in tracks if track["favorite"]}
+            if favorite:
+                favorites.add(track_id)
+            else:
+                favorites.discard(track_id)
+            DATA.mkdir(parents=True, exist_ok=True)
+            temporary = FAVORITES_FILE.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(sorted(favorites), ensure_ascii=False) + "\\n", encoding="utf-8")
+            os.replace(temporary, FAVORITES_FILE)
+            log("track_favorite", {"id": track_id, "favorite": favorite})
+            self.reply(200, {"ok": True, "message": "Favori mis à jour", "id": track_id, "favorite": favorite})
             return
 
         if self.path == "/automation":
