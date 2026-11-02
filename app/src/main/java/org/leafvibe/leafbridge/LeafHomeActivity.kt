@@ -35,6 +35,7 @@ class LeafHomeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences("leafvibe_desktop", MODE_PRIVATE)
+        page = prefs.getInt("last_page", 1).coerceIn(0, 3)
         loadApps()
         renderDesktop()
     }
@@ -85,7 +86,7 @@ class LeafHomeActivity : Activity() {
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brand.addView(text("LEAFVIBE", 22f, fg(), true))
-        brand.addView(text("ANDROID DESKTOP  •  BUREAU ${page + 1}/3", 10f, muted(), true))
+        brand.addView(text("ANDROID DESKTOP  •  ESPACE ${page + 1}/4", 10f, muted(), true))
         top.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         top.addView(button("LeafBridge") { startActivity(Intent(this, MainActivity::class.java)) })
         top.addView(button("⌕ Apps", ::renderDrawer))
@@ -103,6 +104,7 @@ class LeafHomeActivity : Activity() {
                     val dx = event.x - downX
                     if (abs(dx) > dp(55)) {
                         page = (page + if (dx < 0) 1 else -1).coerceIn(0, 3)
+                        prefs.edit().putInt("last_page", page).apply()
                         smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0)
                         updatePageIndicator()
                     }
@@ -114,7 +116,7 @@ class LeafHomeActivity : Activity() {
         val indicator = LinearLayout(this).apply { gravity = Gravity.CENTER; tag = "page_indicator" }
         for (p in 0..3) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
-            setOnClickListener { page = p; horizontal.smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0); updatePageIndicator() }
+            setOnClickListener { page = p; prefs.edit().putInt("last_page", page).apply(); horizontal.smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0); updatePageIndicator() }
         })
         root.addView(indicator)
         root.addView(button("▣  Fenêtres Android  ·  multitâche") { Toast.makeText(this, "Balaye vers le haut et maintiens pour afficher les applications récentes Android.", Toast.LENGTH_LONG).show() })
@@ -363,10 +365,10 @@ class LeafHomeActivity : Activity() {
         })
         pageView.addView(text("Le fond d'écran système Android sera modifié uniquement si tu confirmes ton choix.", 11f, muted()))
         pageView.addView(text("Bureaux", 16f, accent, true).apply { setPadding(0, dp(18), 0, dp(8)) })
-        pageView.addView(button("Retour au bureau 1") { page = 0; renderDesktop() })
-        pageView.addView(button("Retour au bureau 2") { page = 1; renderDesktop() })
-        pageView.addView(button("Retour au bureau 3") { page = 2; renderDesktop() })
-        pageView.addView(button("Retour au bureau 4") { page = 3; renderDesktop() })
+        pageView.addView(button("Retour au bureau 1") { page = 0; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
+        pageView.addView(button("Retour au bureau 2") { page = 1; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
+        pageView.addView(button("Retour au bureau 3") { page = 2; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
+        pageView.addView(button("Retour au bureau 4") { page = 3; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         pageView.addView(button("← Retour") { renderDesktop() })
         setContentView(ScrollView(this).apply { addView(pageView) })
@@ -395,7 +397,7 @@ class LeafHomeActivity : Activity() {
         indicator.removeAllViews()
         for (p in 0..3) indicator.addView(text(if (p == page) "●" else "○", 13f, accent).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
-            setOnClickListener { this@LeafHomeActivity.page = p; renderDesktop() }
+            setOnClickListener { this@LeafHomeActivity.page = p; prefs.edit().putInt("last_page", p).apply(); renderDesktop() }
         })
     }
 
