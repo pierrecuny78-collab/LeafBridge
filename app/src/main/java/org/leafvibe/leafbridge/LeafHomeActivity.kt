@@ -383,6 +383,7 @@ class LeafHomeActivity : Activity() {
         }
         page.addView(text(if (left) "Widgets · Vie privée" else "Widgets · Organisation", 25f, fg(), true))
         page.addView(text(if (left) "Panneau latéral gauche" else "Panneau latéral droit", 12f, muted()))
+        page.addView(button("🌐 Navigation web") { startActivity(Intent(this, LeafBrowserActivity::class.java)) })
         fun widget(title: String, detail: String, action: (() -> Unit)? = null) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -585,6 +586,7 @@ class LeafHomeActivity : Activity() {
             prefs.edit().remove("wallpaper_page_" + index).apply()
             renderWorkspaceSettings(index)
         })
+        panel.addView(button("🌐 Navigation web") { startActivity(Intent(this, LeafBrowserActivity::class.java)) })
         panel.addView(button("Applications de ce bureau") {
             page = index
             category = "Tout"
@@ -631,6 +633,7 @@ class LeafHomeActivity : Activity() {
             startActivityForResult(intent, wallpaperRequest)
         })
         pageView.addView(text("Image enregistrée uniquement dans LeafVibe.", 11f, muted()))
+        pageView.addView(button("🌐 Ouvrir le navigateur web") { startActivity(Intent(this, LeafBrowserActivity::class.java)) })
         pageView.addView(text("Bureaux", 16f, accent, true).apply { setPadding(0, dp(18), 0, dp(8)) })
         pageView.addView(button("Retour au bureau 1") { page = 0; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
         pageView.addView(button("Retour au bureau 2") { page = 1; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
@@ -649,7 +652,7 @@ class LeafHomeActivity : Activity() {
             try {
                 val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                prefs.edit().putString("wallpaper_page_\$wallpaperTargetPage", uri.toString()).apply()
+                prefs.edit().putString("wallpaper_page_" + wallpaperTargetPage, uri.toString()).apply()
                 Toast.makeText(this, "Fond enregistré pour le bureau " + (wallpaperTargetPage + 1), Toast.LENGTH_SHORT).show()
                 renderDesktop()
             } catch (e: Exception) {
