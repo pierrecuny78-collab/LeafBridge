@@ -3,7 +3,7 @@ name: Build LeafBridge APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "feature/leafbridge-engine", "feature/local-first-account" ]
+    branches: [ "main", "feature/leafbridge-engine", "feature/local-first-account", "feature/portable-workspace", "feature/leafvibe-android-desktop" ]
 
 jobs:
   build:
