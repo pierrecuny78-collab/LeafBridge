@@ -361,7 +361,16 @@ class LeafHomeActivity : Activity() {
             pageView.addView(grid)
         }
         pageView.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
-        pageView.addView(button("＋ Personnaliser cet espace", ::renderSettings))
+        pageView.addView(button("⚙", { renderWorkspaceSettings(index) }))
+        val savedWallpaper = prefs.getString("wallpaper_page_" + index, null)
+        if (savedWallpaper != null) {
+            try {
+                contentResolver.openInputStream(Uri.parse(savedWallpaper)).use { stream ->
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) pageView.background = android.graphics.drawable.BitmapDrawable(resources, bitmap)
+                }
+            } catch (_: Exception) { prefs.edit().remove("wallpaper_page_" + index).apply() }
+        }
         return ScrollView(this).apply { isFillViewport = true; addView(pageView) }
     }
 
