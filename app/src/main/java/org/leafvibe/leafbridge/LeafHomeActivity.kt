@@ -1,7 +1,6 @@
 package org.leafvibe.leafbridge
 
 import android.app.Activity
-import android.app.WallpaperManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
@@ -9,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.BatteryManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -33,6 +33,7 @@ class LeafHomeActivity : Activity() {
     private var downX = 0f
     private var downY = 0f
     private val wallpaperRequest = 9201
+    private var wallpaperTargetPage = 1
     private val themes = listOf("Leaf Dark", "Leaf Light", "Ocean", "Forest", "Amber", "Rose", "Graphite", "Solar")
     private val accent = Color.rgb(190, 242, 115)
 
@@ -451,8 +452,8 @@ class LeafHomeActivity : Activity() {
     }
 
     private fun openBluetoothSettings() {
-        try { startActivity(Intent(android.provider.Settings.Panel.ACTION_BLUETOOTH)) }
-        catch (_: Exception) { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
+        try { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
+        catch (_: Exception) { Toast.makeText(this, "Réglages Bluetooth indisponibles", Toast.LENGTH_SHORT).show() }
     }
 
     private fun openUsbPicker() {
@@ -564,11 +565,15 @@ class LeafHomeActivity : Activity() {
             }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(6) })
         }
         pageView.addView(text("Fond d'écran", 16f, accent, true).apply { setPadding(0, dp(18), 0, dp(8)) })
-        pageView.addView(button("Choisir une image dans mes fichiers") {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type = "image/*"; addCategory(Intent.CATEGORY_OPENABLE) }
+        pageView.addView(button("Choisir une image pour ce bureau") {
+            wallpaperTargetPage = page
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "image/*"; addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
             startActivityForResult(intent, wallpaperRequest)
         })
-        pageView.addView(text("Le fond d'écran système Android sera modifié uniquement si tu confirmes ton choix.", 11f, muted()))
+        pageView.addView(text("Image enregistrée uniquement dans LeafVibe.", 11f, muted()))
         pageView.addView(text("Bureaux", 16f, accent, true).apply { setPadding(0, dp(18), 0, dp(8)) })
         pageView.addView(button("Retour au bureau 1") { page = 0; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
         pageView.addView(button("Retour au bureau 2") { page = 1; prefs.edit().putInt("last_page", page).apply(); renderDesktop() })
@@ -585,14 +590,13 @@ class LeafHomeActivity : Activity() {
         if (requestCode == wallpaperRequest && resultCode == RESULT_OK) {
             val uri: Uri = data?.data ?: return
             try {
-                contentResolver.openInputStream(uri).use { stream ->
-                    val bitmap = android.graphics.BitmapFactory.decodeStream(stream)
-                        ?: throw IllegalArgumentException("Image illisible")
-                    WallpaperManager.getInstance(this).setBitmap(bitmap)
-                    Toast.makeText(this, "Fond d'écran appliqué", Toast.LENGTH_SHORT).show()
-                }
+                val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                prefs.edit().putString("wallpaper_page_\$wallpaperTargetPage", uri.toString()).apply()
+                Toast.makeText(this, "Fond enregistré pour le bureau " + (wallpaperTargetPage + 1), Toast.LENGTH_SHORT).show()
+                renderDesktop()
             } catch (e: Exception) {
-                Toast.makeText(this, e.message ?: "Impossible d'appliquer le fond", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Accès à l'image refusé : " + (e.message ?: "autorisation indisponible"), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -608,6 +612,6 @@ class LeafHomeActivity : Activity() {
 
     @Deprecated("Back returns to the desktop")
     override fun onBackPressed() {
-        if (drawer) renderDesktop() else super.onBackPressed()
+        if (authenticated) renderDesktop() else super.onBackPressed()
     }
 }
