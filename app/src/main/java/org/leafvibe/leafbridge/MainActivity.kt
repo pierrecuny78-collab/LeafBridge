@@ -139,13 +139,13 @@ class MainActivity : Activity() {
         content.addView(heading("Tableau de bord"))
         status = paragraph("Vérification de Termux…")
         content.addView(status)
-        card("Shazam", "Réception des notifications Shazam sur Android.") {
+        card("Shazam", "Réception des notifications Shazam sur Android.", "Gérer l’accès") {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        card("Moteur Termux", "Le moteur local exécute les tâches autorisées en arrière-plan.") {
+        card("Moteur Termux", "Le moteur local exécute les tâches autorisées en arrière-plan.", "Tester la connexion") {
             checkTermux()
         }
-        card("Accès notifications", "Autoriser LeafBridge à lire les notifications Shazam.") {
+        card("Accès notifications", "Autoriser LeafBridge à lire les notifications Shazam.", "Ouvrir les autorisations") {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
         card("Ouvrir les automatisations", "Démarrer ou arrêter les modules depuis leurs propres boutons.", "Voir les automatisations") {
