@@ -34,6 +34,8 @@ class LeafHomeActivity : Activity() {
     private var downY = 0f
     private val wallpaperRequest = 9201
     private var wallpaperTargetPage = 1
+    private val bannerRequest = 9202
+    private var bannerTargetPage = 1
     private val themes = listOf("Leaf Dark", "Leaf Light", "Ocean", "Forest", "Amber", "Rose", "Graphite", "Solar")
     private val accent = Color.rgb(190, 242, 115)
 
@@ -267,6 +269,18 @@ class LeafHomeActivity : Activity() {
         val pageView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(4), dp(18), dp(4), dp(12))
+        }
+        val bannerUri = prefs.getString("banner_page_" + index, null)
+        if (!bannerUri.isNullOrBlank()) {
+            val banner = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Image de présentation du bureau " + (index + 1)
+                try { setImageURI(Uri.parse(bannerUri)) } catch (_: Exception) {}
+            }
+            pageView.addView(banner, LinearLayout.LayoutParams(dp(250), dp(82)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(12)
+            })
         }
         fun card(label: String, detail: String, action: () -> Unit) {
             val item = LinearLayout(this).apply {
@@ -582,6 +596,20 @@ class LeafHomeActivity : Activity() {
             }
             startActivityForResult(pick, wallpaperRequest)
         })
+        panel.addView(button("Ajouter une image rectangulaire en haut du bureau") {
+            bannerTargetPage = index
+            val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "image/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
+            startActivityForResult(pick, bannerRequest)
+        })
+        panel.addView(text("Image de présentation centrée en haut, indépendante pour chaque bureau.", 11f, muted()))
+        panel.addView(button("Retirer l'image du haut") {
+            prefs.edit().remove("banner_page_" + index).apply()
+            renderWorkspaceSettings(index)
+        })
         panel.addView(button("Retirer le fond d'écran") {
             prefs.edit().remove("wallpaper_page_" + index).apply()
             renderWorkspaceSettings(index)
@@ -647,13 +675,18 @@ class LeafHomeActivity : Activity() {
     @Deprecated("Uses the Android document picker")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == wallpaperRequest && resultCode == RESULT_OK) {
+        if ((requestCode == wallpaperRequest || requestCode == bannerRequest) && resultCode == RESULT_OK) {
             val uri: Uri = data?.data ?: return
             try {
                 val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                prefs.edit().putString("wallpaper_page_" + wallpaperTargetPage, uri.toString()).apply()
-                Toast.makeText(this, "Fond enregistré pour le bureau " + (wallpaperTargetPage + 1), Toast.LENGTH_SHORT).show()
+                if (requestCode == bannerRequest) {
+                    prefs.edit().putString("banner_page_" + bannerTargetPage, uri.toString()).apply()
+                    Toast.makeText(this, "Image du haut enregistrée pour le bureau " + (bannerTargetPage + 1), Toast.LENGTH_SHORT).show()
+                } else {
+                    prefs.edit().putString("wallpaper_page_" + wallpaperTargetPage, uri.toString()).apply()
+                    Toast.makeText(this, "Fond enregistré pour le bureau " + (wallpaperTargetPage + 1), Toast.LENGTH_SHORT).show()
+                }
                 renderDesktop()
             } catch (e: Exception) {
                 Toast.makeText(this, "Accès à l'image refusé : " + (e.message ?: "autorisation indisponible"), Toast.LENGTH_LONG).show()
