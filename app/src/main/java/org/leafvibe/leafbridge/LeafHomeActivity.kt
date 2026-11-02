@@ -564,6 +564,54 @@ class LeafHomeActivity : Activity() {
         setContentView(pageView)
     }
 
+
+    private fun renderWorkspaceSettings(index: Int) {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(24), dp(18), dp(16))
+            setBackgroundColor(bg())
+        }
+        panel.addView(text("Bureau " + (index + 1), 25f, fg(), true))
+        panel.addView(button("Changer le fond d'écran") {
+            wallpaperTargetPage = index
+            val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "image/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
+            startActivityForResult(pick, wallpaperRequest)
+        })
+        panel.addView(button("Retirer le fond d'écran") {
+            prefs.edit().remove("wallpaper_page_" + index).apply()
+            renderWorkspaceSettings(index)
+        })
+        panel.addView(button("Applications de ce bureau") {
+            page = index
+            category = "Tout"
+            renderDrawer()
+        })
+        panel.addView(button("Minuteur de concentration") {
+            val input = EditText(this).apply {
+                hint = "Durée en minutes (ex. 25)"
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                setText(prefs.getInt("focus_minutes_" + index, 25).toString())
+            }
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Minuteur du bureau " + (index + 1))
+                .setView(input)
+                .setPositiveButton("Enregistrer") { _, _ ->
+                    val value = input.text.toString().toIntOrNull()?.coerceIn(1, 240) ?: 25
+                    prefs.edit().putInt("focus_minutes_" + index, value).apply()
+                    Toast.makeText(this, "Minuteur réglé : " + value + " min", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Annuler", null)
+                .show()
+        })
+        panel.addView(button("Thèmes") { renderSettings() })
+        panel.addView(button("← Retour au bureau") { page = index; renderDesktop() })
+        setContentView(ScrollView(this).apply { addView(panel) })
+    }
+
     private fun renderSettings() {
         val pageView = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(24), dp(18), dp(16)); setBackgroundColor(bg()) }
         pageView.addView(text("Personnaliser LeafVibe", 24f, fg(), true))
