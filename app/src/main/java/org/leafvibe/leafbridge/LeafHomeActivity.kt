@@ -28,6 +28,7 @@ class LeafHomeActivity : Activity() {
     private var category = "Tout"
     private var apps: List<ApplicationInfo> = emptyList()
     private var downX = 0f
+    private var downY = 0f
     private val wallpaperRequest = 9201
     private val themes = listOf("Leaf Dark", "Leaf Light", "Ocean", "Forest", "Amber")
     private val accent = Color.rgb(190, 242, 115)
@@ -105,6 +106,26 @@ class LeafHomeActivity : Activity() {
         top.addView(button("⌕ Apps", ::renderDrawer))
         top.addView(button("⚙", ::renderSettings))
         root.addView(top)
+        val webSearch = EditText(this).apply {
+            hint = "Rechercher sur le Web…"
+            setSingleLine(true)
+            textSize = 14f
+            setTextColor(fg())
+            setHintTextColor(muted())
+            background = shape(panelColor(), 16)
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            setOnEditorActionListener { field, _, _ ->
+                val query = field.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    val intent = Intent(Intent.ACTION_WEB_SEARCH).putExtra(android.app.SearchManager.QUERY, query)
+                    try { startActivity(intent) } catch (_: Exception) {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query))))
+                    }
+                }
+                true
+            }
+        }
+        root.addView(webSearch, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10); bottomMargin = dp(6) })
         val pages = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for (p in 0..3) pages.addView(buildPage(p), LinearLayout.LayoutParams(resources.displayMetrics.widthPixels - dp(32), -1))
         val horizontal = HorizontalScrollView(this).apply {
@@ -112,9 +133,14 @@ class LeafHomeActivity : Activity() {
             addView(pages)
             post { smoothScrollTo(page * (resources.displayMetrics.widthPixels - dp(32)), 0) }
             setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN) downX = event.x
+                if (event.action == MotionEvent.ACTION_DOWN) { downX = event.x; downY = event.y }
                 if (event.action == MotionEvent.ACTION_UP) {
                     val dx = event.x - downX
+                    val dy = event.y - downY
+                    if (dy < -dp(65) && abs(dy) > abs(dx)) {
+                        renderDrawer()
+                        return@setOnTouchListener true
+                    }
                     if (abs(dx) > dp(55)) {
                         page = (page + if (dx < 0) 1 else -1).coerceIn(0, 3)
                         prefs.edit().putInt("last_page", page).apply()
@@ -340,10 +366,13 @@ class LeafHomeActivity : Activity() {
         head.addView(button("← Bureau") { renderDesktop() })
         pageView.addView(head)
         val categories = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Tout", "Communication", "Médias", "Outils").forEach { cat ->
-            categories.addView(button(cat) { category = cat; renderDrawer() }, LinearLayout.LayoutParams(0, -2, 1f))
+        listOf("Tout", "Privé", "Pro", "Organisation", "Communication", "Médias", "Santé", "Outils").forEach { cat ->
+            categories.addView(button(if (category == cat) "● $cat" else cat) { category = cat; renderDrawer() })
         }
-        pageView.addView(categories)
+        pageView.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(categories)
+        })
         val search = EditText(this).apply {
             hint = "Rechercher une application"; setTextColor(fg()); setHintTextColor(muted())
             background = shape(panelColor(), 14); setPadding(dp(14), dp(8), dp(14), dp(8))
@@ -358,6 +387,10 @@ class LeafHomeActivity : Activity() {
                 val matchesCategory = when(category) {
                     "Communication" -> name.contains(Regex("message|mail|phone|contact|whats|telegram|signal", RegexOption.IGNORE_CASE))
                     "Médias" -> name.contains(Regex("music|spotify|shazam|photo|camera|video|youtube", RegexOption.IGNORE_CASE))
+                    "Santé" -> name.contains(Regex("health|wear|fit|watch|fitness", RegexOption.IGNORE_CASE))
+                    "Organisation" -> name.contains(Regex("calendar|agenda|task|todo|note|keep|clock|tracker", RegexOption.IGNORE_CASE))
+                    "Privé" -> name.contains(Regex("photo|camera|gallery|message|phone|health", RegexOption.IGNORE_CASE))
+                    "Pro" -> name.contains(Regex("office|word|excel|mail|drive|teams|github|termux", RegexOption.IGNORE_CASE))
                     "Outils" -> name.contains(Regex("file|drive|settings|termux|calculator|clock|github", RegexOption.IGNORE_CASE))
                     else -> true
                 }
