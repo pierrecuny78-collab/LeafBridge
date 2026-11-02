@@ -215,23 +215,59 @@ class MainActivity : Activity() {
     }
 
     private fun music() {
-        title("Bibliothèque musicale", "Tes titres détectés et tes futurs classements.")
-        addPanel(panel().apply {
-            addView(label("COLLECTE SHAZAM", 11f, green, true))
-            addView(label("Les titres apparaîtront ici après réception d'une vraie notification Shazam.", 14f, white))
-            addView(label("À venir : recherche, filtres, favoris, doublons et export LeafMusic.", 12f))
-        })
-        addPanel(panel().apply {
-            addView(label("PLAYLISTS", 11f, green, true))
-            listOf("Tous les titres", "À classer", "Favoris", "Par genre", "Par ambiance", "À synchroniser").forEach {
-                addView(label("♫   $it", 14f, white))
+        title("Bibliothèque musicale", "Ta collection locale, dédupliquée et consultable.")
+        val summary = panel()
+        summary.addView(label("COLLECTION LEAFBRIDGE", 11f, green, true))
+        summary.addView(label("Chargement de ta bibliothèque…", 14f, white))
+        summary.addView(button("Actualiser", true) { navigate("Musique") })
+        addPanel(summary)
+        request("GET", "/library", null) { ok, message, json ->
+            runOnUiThread {
+                if (current != "Musique") return@runOnUiThread
+                content.removeAllViews()
+                title("Bibliothèque musicale", "Ta collection locale, dédupliquée et consultable.")
+                val tracks = json?.optJSONArray("tracks")
+                val total = json?.optInt("total", 0) ?: 0
+                val favorites = json?.optInt("favorites", 0) ?: 0
+                addPanel(panel().apply {
+                    addView(label("VUE D'ENSEMBLE", 11f, green, true))
+                    addView(label("$total titre(s) enregistré(s)", 21f, white, true))
+                    addView(label("$favorites favori(s) · Stockage local Termux", 12f))
+                    addView(button("Actualiser la bibliothèque", true) { navigate("Musique") })
+                })
+                if (!ok || tracks == null) {
+                    addPanel(panel().apply { addView(label(message, 13f, white)) })
+                    return@runOnUiThread
+                }
+                if (tracks.length() == 0) {
+                    addPanel(panel().apply {
+                        addView(label("AUCUN TITRE POUR LE MOMENT", 11f, green, true))
+                        addView(label("Les notifications Shazam reçues apparaîtront automatiquement ici.", 14f, white))
+                        addView(label("Les anciennes entrées de test sont ignorées.", 12f))
+                    })
+                } else {
+                    for (i in 0 until tracks.length()) {
+                        val track = tracks.optJSONObject(i) ?: continue
+                        val id = track.optString("id")
+                        val isFavorite = track.optBoolean("favorite")
+                        addPanel(panel().apply {
+                            addView(label(track.optString("title", "Titre inconnu"), 17f, white, true))
+                            addView(label(track.optString("artist", "Artiste non renseigné"), 13f, muted))
+                            addView(label("Reçu : " + track.optString("first_seen", "Date inconnue"), 10f, muted))
+                            addView(button(if (isFavorite) "★ Retirer des favoris" else "☆ Ajouter aux favoris", isFavorite) {
+                                val body = JSONObject().put("id", id).put("favorite", !isFavorite).toString()
+                                request("POST", "/track", body) { success, result, _ ->
+                                    runOnUiThread {
+                                        Toast.makeText(this@MainActivity, result, Toast.LENGTH_SHORT).show()
+                                        if (success && current == "Musique") navigate("Musique")
+                                    }
+                                }
+                            })
+                        })
+                    }
+                }
             }
-        })
-        addPanel(panel().apply {
-            addView(label("DESTINATIONS", 11f, green, true))
-            addView(label("Spotify · LeafMusic · Stockage local / carte SD", 13f, white))
-            addView(label("Les transferts seront activés après connexion officielle et configuration du stockage.", 12f))
-        })
+        }
     }
 
     private fun activityLog() {
