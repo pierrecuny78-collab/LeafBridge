@@ -20,6 +20,9 @@ import kotlin.math.abs
 
 class LeafHomeActivity : Activity() {
     private lateinit var prefs: SharedPreferences
+    private lateinit var profileStore: LocalProfileStore
+    private var authenticated = false
+    private var pinBusy = false
     private lateinit var root: LinearLayout
     private lateinit var desktop: LinearLayout
     private lateinit var dock: LinearLayout
@@ -30,23 +33,101 @@ class LeafHomeActivity : Activity() {
     private var downX = 0f
     private var downY = 0f
     private val wallpaperRequest = 9201
-    private val themes = listOf("Leaf Dark", "Leaf Light", "Ocean", "Forest", "Amber")
+    private val themes = listOf("Leaf Dark", "Leaf Light", "Ocean", "Forest", "Amber", "Rose", "Graphite", "Solar")
     private val accent = Color.rgb(190, 242, 115)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences("leafvibe_desktop", MODE_PRIVATE)
+        profileStore = LocalProfileStore(this)
         page = prefs.getInt("last_page", 1).coerceIn(0, 3)
+        if (profileStore.exists()) showPinUnlock() else showPinSetup()
+    }
+
+    private fun enterWorkspace() {
+        authenticated = true
         renderDesktop()
         Thread {
             val loaded = loadApps()
             runOnUiThread {
-                if (!isFinishing) {
+                if (!isFinishing && authenticated) {
                     apps = loaded
                     if (!drawer) renderDesktop()
                 }
             }
         }.start()
+    }
+
+    private fun showPinSetup() {
+        val page = pinScreen("Sécuriser cet appareil", "Crée un code PIN local pour protéger LeafVibe.")
+        val pin = pinInput("Code PIN (6 chiffres minimum)")
+        val confirm = pinInput("Confirmer le code PIN")
+        page.addView(pin, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(22) })
+        page.addView(confirm, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
+        page.addView(button("Créer le code PIN") {
+            val a = pin.text.toString().toCharArray()
+            val b = confirm.text.toString()
+            if (a.size < 6 || a.any { !it.isDigit() } || String(a) != b) {
+                a.fill(' ')
+                Toast.makeText(this, "PIN invalide ou différent.", Toast.LENGTH_LONG).show()
+            } else if (!pinBusy) {
+                pinBusy = true
+                Thread {
+                    val ok = profileStore.create("Utilisateur LeafVibe", a)
+                    a.fill(' ')
+                    runOnUiThread {
+                        pinBusy = false
+                        if (ok) enterWorkspace()
+                        else Toast.makeText(this, "Impossible d'enregistrer le PIN.", Toast.LENGTH_LONG).show()
+                    }
+                }.start()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(14) })
+        setContentView(page)
+    }
+
+    private fun showPinUnlock() {
+        authenticated = false
+        val page = pinScreen("Bienvenue", "Déverrouille ton espace personnel.")
+        val pin = pinInput("Code PIN")
+        page.addView(pin, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(24) })
+        page.addView(button("Déverrouiller") {
+            val value = pin.text.toString().toCharArray()
+            if (value.isNotEmpty() && !pinBusy) {
+                pinBusy = true
+                Thread {
+                    val ok = profileStore.verify(value)
+                    value.fill(' ')
+                    runOnUiThread {
+                        pinBusy = false
+                        if (ok) enterWorkspace()
+                        else { pin.text.clear(); Toast.makeText(this, "Code incorrect.", Toast.LENGTH_SHORT).show() }
+                    }
+                }.start()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(12) })
+        setContentView(page)
+    }
+
+    private fun pinScreen(title: String, subtitle: String): LinearLayout {
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(28), dp(28), dp(28))
+            setBackgroundColor(bg())
+        }
+        page.addView(text("LEAFVIBE", 30f, fg(), true).apply { gravity = Gravity.CENTER })
+        page.addView(text(title, 23f, fg(), true).apply { gravity = Gravity.CENTER; setPadding(0, dp(18), 0, dp(6)) })
+        page.addView(text(subtitle, 13f, muted()).apply { gravity = Gravity.CENTER })
+        return page
+    }
+
+    private fun pinInput(hintText: String): EditText = EditText(this).apply {
+        hint = hintText
+        inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        setTextColor(fg()); setHintTextColor(muted())
+        background = shape(panelColor(), 14)
+        setPadding(dp(14), dp(12), dp(14), dp(12))
     }
 
     private fun loadApps(): List<ApplicationInfo> = try {
@@ -65,6 +146,9 @@ class LeafHomeActivity : Activity() {
         "Ocean" -> Color.rgb(10, 35, 55)
         "Forest" -> Color.rgb(12, 43, 35)
         "Amber" -> Color.rgb(49, 34, 20)
+        "Rose" -> Color.rgb(48, 25, 39)
+        "Graphite" -> Color.rgb(28, 31, 36)
+        "Solar" -> Color.rgb(40, 38, 18)
         else -> Color.rgb(10, 18, 25)
     }
     private fun panelColor(): Int = when (prefs.getString("theme", "Leaf Dark")) {
@@ -72,6 +156,9 @@ class LeafHomeActivity : Activity() {
         "Ocean" -> Color.rgb(23, 58, 78)
         "Forest" -> Color.rgb(27, 61, 49)
         "Amber" -> Color.rgb(70, 49, 31)
+        "Rose" -> Color.rgb(75, 43, 61)
+        "Graphite" -> Color.rgb(48, 53, 60)
+        "Solar" -> Color.rgb(65, 60, 30)
         else -> Color.rgb(24, 39, 49)
     }
     private fun fg(): Int = if (prefs.getString("theme", "Leaf Dark") == "Leaf Light") Color.rgb(25, 40, 34) else Color.WHITE
