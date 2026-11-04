@@ -52,7 +52,11 @@ class Handler(BaseHTTPRequestHandler):
             size = int(self.headers.get("Content-Length", "0"))
             if size < 0 or size > 65536:
                 return self._send(413, {"ok": False, "message": "Requête trop volumineuse"})
-            payload = json.loads(self.rfile.read(size) or b"{}")
+            if size == 0:
+                return self._send(400, {"ok": False, "message": "Corps JSON manquant"})
+            payload = json.loads(self.rfile.read(size))
+            if not isinstance(payload, dict):
+                return self._send(400, {"ok": False, "message": "Le JSON doit être un objet"})
         except Exception:
             return self._send(400, {"ok": False, "message": "JSON invalide"})
 
@@ -79,11 +83,20 @@ class Handler(BaseHTTPRequestHandler):
         if command == "stop":
             proc = PROCESSES.get(key)
             if proc and proc.poll() is None:
-                proc.terminate()
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
                 try:
                     proc.wait(timeout=3)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    proc.wait(timeout=2)
             PROCESSES.pop(key, None)
             STATES[key] = "stopped"
             return self._send(200, {"ok": True, "message": key + " arrêtée"})
@@ -99,14 +112,16 @@ class Handler(BaseHTTPRequestHandler):
         existing = PROCESSES.get(key)
         if existing and existing.poll() is None:
             return self._send(200, {"ok": True, "message": key + " fonctionne déjà"})
-        proc = subprocess.Popen(
-            ["/data/data/com.termux/files/usr/bin/bash", str(script)],
-            cwd=str(ROOT),
-            stdin=subprocess.DEVNULL,
-            stdout=(DATA / (key + ".log")).open("a", encoding="utf-8"),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        log_path = DATA / (key + ".log")
+        with log_path.open("a", encoding="utf-8") as log_file:
+            proc = subprocess.Popen(
+                ["/data/data/com.termux/files/usr/bin/bash", str(script)],
+                cwd=str(ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
         PROCESSES[key] = proc
         STATES[key] = "running"
         return self._send(200, {"ok": True, "message": key + " démarrée"})
