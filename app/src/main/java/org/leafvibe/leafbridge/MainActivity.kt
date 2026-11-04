@@ -252,6 +252,7 @@ class MainActivity : Activity() {
         view.settings.allowContentAccess = false
         view.settings.javaScriptCanOpenWindowsAutomatically = false
         view.settings.setSupportMultipleWindows(false)
+        view.settings.setSafeBrowsingEnabled(true)
         view.settings.allowFileAccessFromFileURLs = false
         view.settings.allowUniversalAccessFromFileURLs = false
         view.webViewClient = object : WebViewClient() {
@@ -298,6 +299,11 @@ class MainActivity : Activity() {
         if (!target.startsWith("http://") && !target.startsWith("https://")) {
             target = if (target.contains(".") && !target.contains(" ")) "https://$target"
                 else "https://www.google.com/search?q=" + URLEncoder.encode(target, "UTF-8")
+        }
+        val parsedTarget = android.net.Uri.parse(target)
+        if (parsedTarget.scheme !in listOf("http", "https") || parsedTarget.host.isNullOrBlank()) {
+            Toast.makeText(this, "Adresse refusée : seuls les liens HTTP et HTTPS sont autorisés.", Toast.LENGTH_LONG).show()
+            return
         }
         webViews[activeTab].loadUrl(target)
     }
@@ -361,7 +367,12 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        webViews.forEach { it.destroy() }
+        webViews.forEach {
+            (it.parent as? ViewGroup)?.removeView(it)
+            it.stopLoading()
+            it.destroy()
+        }
+        webViews.clear()
         executor.shutdown()
         super.onDestroy()
     }
