@@ -216,7 +216,7 @@ class MainActivity : Activity() {
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         addressBar = EditText(this).apply {
             hint = "Adresse web ou recherche"
-            singleLine = true
+            setSingleLine(true)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
             setText("https://www.google.com")
@@ -240,7 +240,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
         }
-        content.addView(webHost, LinearLayout.LayoutParams(-1, 0, 1f).apply { height = 900 })
+        content.addView(webHost, LinearLayout.LayoutParams(-1, (resources.displayMetrics.density * 520).toInt()))
         if (webViews.isEmpty()) addTab("https://www.google.com") else displayActiveTab()
     }
 
@@ -310,7 +310,9 @@ class MainActivity : Activity() {
 
     private fun refreshStatus() {
         requestEngine("GET", "/status", null) { ok, message ->
-            if (::status.isInitialized) status.text = if (ok) "Moteur Termux : connecté" else "Moteur Termux : hors ligne"
+            if (::status.isInitialized && currentPage == "Accueil") {
+                status.text = if (ok) "Moteur Termux : connecté" else "Moteur Termux : hors ligne"
+            }
         }
     }
 
@@ -325,8 +327,9 @@ class MainActivity : Activity() {
         executor.execute {
             var ok = false
             var message = "Termux inaccessible. Démarre le moteur LeafBridge dans Termux."
+            var connection: HttpURLConnection? = null
             try {
-                val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
+                connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
                 connection.requestMethod = method
                 connection.connectTimeout = 2500
                 connection.readTimeout = 2500
@@ -341,9 +344,14 @@ class MainActivity : Activity() {
                 val json = try { JSONObject(response) } catch (_: Exception) { JSONObject() }
                 ok = code in 200..299
                 message = json.optString("message", if (ok) "Termux connecté" else "Erreur moteur : HTTP $code")
-                connection.disconnect()
-            } catch (_: Exception) { }
-            runOnUiThread { done(ok, message) }
+            } catch (error: Exception) {
+                message = "Connexion Termux impossible : ${error.localizedMessage ?: error.javaClass.simpleName}"
+            } finally {
+                connection?.disconnect()
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) done(ok, message)
+            }
         }
     }
 
