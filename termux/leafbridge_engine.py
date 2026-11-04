@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
                 "notification_key": notification_key or None,
             }
             with (DATA / "shazam-inbox.jsonl").open("a", encoding="utf-8") as file:
-                file.write(json.dumps(entry, ensure_ascii=False) + "\\n")
+                file.write(json.dumps(entry, ensure_ascii=False) + "\n")
             if notification_key:
                 seen.add(notification_key)
                 seen_path.write_text(
