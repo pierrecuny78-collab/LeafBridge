@@ -61,15 +61,32 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"ok": False, "message": "JSON invalide"})
 
         if self.path == "/shazam":
+            notification_key = str(payload.get("notification_key", ""))[:512]
+            seen_path = DATA / "shazam-seen.json"
+            try:
+                seen = set(json.loads(seen_path.read_text(encoding="utf-8"))) if seen_path.exists() else set()
+            except (OSError, ValueError, TypeError):
+                seen = set()
+
+            if notification_key and notification_key in seen:
+                return self._send(200, {"ok": True, "message": "Notification Shazam déjà enregistrée"})
+
             entry = {
                 "received_at": int(time.time()),
                 "package": payload.get("package", payload.get("source", "unknown")),
                 "title": str(payload.get("title", ""))[:500],
                 "text": str(payload.get("text", ""))[:2000],
                 "post_time": payload.get("post_time"),
+                "notification_key": notification_key or None,
             }
             with (DATA / "shazam-inbox.jsonl").open("a", encoding="utf-8") as file:
-                file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                file.write(json.dumps(entry, ensure_ascii=False) + "\\n")
+            if notification_key:
+                seen.add(notification_key)
+                seen_path.write_text(
+                    json.dumps(sorted(seen)[-5000:], ensure_ascii=False),
+                    encoding="utf-8"
+                )
             return self._send(200, {"ok": True, "message": "Notification Shazam enregistrée"})
 
         if self.path != "/automation":
