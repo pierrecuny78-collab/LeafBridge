@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+import hashlib
 import json
 import os
 import re
@@ -198,17 +199,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/shazam":
             notification_key = str(payload.get("notification_key", ""))[:512]
+            title = str(payload.get("title", ""))[:500]
+            text = str(payload.get("text", ""))[:2000]
+            fingerprint = hashlib.sha256((notification_key + "\n" + title + "\n" + text).encode("utf-8")).hexdigest()
             try:
                 seen = set(json.loads(SEEN_PATH.read_text(encoding="utf-8"))) if SEEN_PATH.exists() else set()
             except (OSError, ValueError, TypeError):
                 seen = set()
-            if notification_key and notification_key in seen:
+            if fingerprint in seen:
                 return self._send(200, {"ok": True, "message": "Notification déjà traitée"})
             entry = {
                 "received_at": int(time.time()),
                 "package": str(payload.get("package", "com.shazam.android")),
-                "title": str(payload.get("title", ""))[:500],
-                "text": str(payload.get("text", ""))[:2000],
+                "title": title,
+                "text": text,
                 "post_time": payload.get("post_time"),
                 "notification_key": notification_key or None,
             }
@@ -221,9 +225,8 @@ class Handler(BaseHTTPRequestHandler):
             entry["result"] = message
             with INBOX.open("a", encoding="utf-8") as file:
                 file.write(json.dumps(entry, ensure_ascii=False) + "\n")
-            if notification_key:
-                seen.add(notification_key)
-                SEEN_PATH.write_text(json.dumps(sorted(seen)[-5000:], ensure_ascii=False), encoding="utf-8")
+            seen.add(fingerprint)
+            SEEN_PATH.write_text(json.dumps(sorted(seen)[-5000:], ensure_ascii=False), encoding="utf-8")
             return self._send(200, {"ok": True, "spotify_added": success, "message": message})
 
         if self.path != "/automation":
