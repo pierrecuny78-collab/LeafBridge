@@ -50,11 +50,11 @@ jobs:
           if-no-files-found: error
 
       - name: Copy APK into the GitHub project
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref_name == 'fix/leafbridge-stability')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TARGET_BRANCH: ${{ github.head_ref }}
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           mkdir -p downloads
           cp app/build/outputs/apk/debug/app-debug.apk downloads/LeafBridge-preview.apk
