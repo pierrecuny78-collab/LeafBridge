@@ -63,3 +63,8 @@ Ouvrir Réglages → « Choisir LeafBridge comme lanceur par défaut », puis s�
 ## Compilation APK
 
 Ouvrir Actions → Build LeafBridge APK, puis télécharger l’artefact `LeafBridge-debug` de la dernière exécution réussie. Cette branche est une version de test ; elle n’est pas encore fusionnée dans `main`.
+
+
+## Téléchargement direct du paquet Preview
+
+Après une compilation CI réussie, le fichier est publié dans [`downloads/LeafBridge-preview.apk`](https://github.com/pierrecuny78-collab/LeafBridge/blob/fix/leafbridge-stability/downloads/LeafBridge-preview.apk).
