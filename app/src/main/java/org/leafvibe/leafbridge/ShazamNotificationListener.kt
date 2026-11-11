@@ -61,7 +61,8 @@ class ShazamNotificationListener : NotificationListenerService() {
             if (log.length() > 2L * 1024L * 1024L) {
                 val bytes = log.readBytes()
                 val start = (bytes.size - 2 * 1024 * 1024).coerceAtLeast(0)
-                val boundary = bytes.indexOf(10, start).let { if (it >= 0) it + 1 else start }
+                val newline = (start until bytes.size).firstOrNull { bytes[it] == 10.toByte() } ?: -1
+                val boundary = if (newline >= 0) newline + 1 else start
                 log.writeBytes(bytes.copyOfRange(boundary, bytes.size))
             }
             LeafAutoBackupScheduler.requestSoon(this)
