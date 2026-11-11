@@ -37,8 +37,14 @@ class MainActivity : Activity() {
     private var activeTab = 0
     private var currentPage = "Accueil"
 
+    override fun onStop() {
+        LeafAutoBackupScheduler.requestSoon(this)
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LeafAutoBackupScheduler.install(this)
         buildShell()
         showHome()
     }
