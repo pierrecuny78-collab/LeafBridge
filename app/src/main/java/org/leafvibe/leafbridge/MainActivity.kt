@@ -216,7 +216,7 @@ class MainActivity : Activity() {
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         addressBar = EditText(this).apply {
             hint = "Adresse web ou recherche"
-            singleLine = true
+            setSingleLine(true)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
             setText("https://www.google.com")
