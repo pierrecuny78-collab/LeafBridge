@@ -23,4 +23,5 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 }
