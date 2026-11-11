@@ -48,8 +48,7 @@ class ShazamNotificationListener : NotificationListenerService() {
             connection.responseCode
             connection.disconnect()
         } catch (_: Exception) {
-            // La notification n'est pas conservée si Termux est indisponible.
-            // Une file de reprise sera ajoutée après validation du premier échange.
+            // La copie locale est conservée même si Termux est momentanément indisponible.
         }
     }
 
@@ -57,7 +56,7 @@ class ShazamNotificationListener : NotificationListenerService() {
         runCatching {
             val folder = File(filesDir, "leafbridge").apply { mkdirs() }
             val log = File(folder, "shazam-notifications.jsonl")
-            log.appendText(payload + "\\n", Charsets.UTF_8)
+            log.appendText(payload + "\n", Charsets.UTF_8)
             // Keep the local audit log bounded; retain the newest 2 MiB.
             if (log.length() > 2L * 1024L * 1024L) {
                 val bytes = log.readBytes()
