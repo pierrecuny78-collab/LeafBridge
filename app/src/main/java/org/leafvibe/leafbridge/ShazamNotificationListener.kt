@@ -6,6 +6,7 @@ import android.service.notification.StatusBarNotification
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.io.File
 import java.util.concurrent.Executors
 
 class ShazamNotificationListener : NotificationListenerService() {
@@ -34,6 +35,7 @@ class ShazamNotificationListener : NotificationListenerService() {
     }
 
     private fun postToTermux(payload: String) {
+        persistNotification(payload)
         try {
             val connection = (URL("http://127.0.0.1:8765/shazam").openConnection()
                 as HttpURLConnection)
@@ -46,8 +48,24 @@ class ShazamNotificationListener : NotificationListenerService() {
             connection.responseCode
             connection.disconnect()
         } catch (_: Exception) {
-            // La notification n'est pas conservée si Termux est indisponible.
-            // Une file de reprise sera ajoutée après validation du premier échange.
+            // La copie locale est conservée même si Termux est momentanément indisponible.
+        }
+    }
+
+    private fun persistNotification(payload: String) {
+        runCatching {
+            val folder = File(filesDir, "leafbridge").apply { mkdirs() }
+            val log = File(folder, "shazam-notifications.jsonl")
+            log.appendText(payload + "\n", Charsets.UTF_8)
+            // Keep the local audit log bounded; retain the newest 2 MiB.
+            if (log.length() > 2L * 1024L * 1024L) {
+                val bytes = log.readBytes()
+                val start = (bytes.size - 2 * 1024 * 1024).coerceAtLeast(0)
+                val newline = (start until bytes.size).firstOrNull { bytes[it] == 10.toByte() } ?: -1
+                val boundary = if (newline >= 0) newline + 1 else start
+                log.writeBytes(bytes.copyOfRange(boundary, bytes.size))
+            }
+            LeafAutoBackupScheduler.requestSoon(this)
         }
     }
 

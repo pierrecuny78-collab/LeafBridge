@@ -37,8 +37,14 @@ class MainActivity : Activity() {
     private var activeTab = 0
     private var currentPage = "Accueil"
 
+    override fun onStop() {
+        LeafAutoBackupScheduler.requestSoon(this)
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LeafAutoBackupScheduler.install(this)
         buildShell()
         showHome()
     }
@@ -216,7 +222,7 @@ class MainActivity : Activity() {
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         addressBar = EditText(this).apply {
             hint = "Adresse web ou recherche"
-            singleLine = true
+            setSingleLine(true)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
             setText("https://www.google.com")
