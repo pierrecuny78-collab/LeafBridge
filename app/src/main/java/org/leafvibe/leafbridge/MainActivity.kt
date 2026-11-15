@@ -46,14 +46,14 @@ class MainActivity : Activity() {
     private fun buildShell() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(12, 20, 29))
+            setBackgroundColor(LeafColour.CREAM_DARK)
         }
         val header = TextView(this).apply {
             text = "LEAFBRIDGE  •  V1.1"
             textSize = 19f
-            setTextColor(Color.WHITE)
+            setTextColor(LeafColour.CREAM_DARK)
             setPadding(22, 20, 16, 16)
-            setBackgroundColor(Color.rgb(20, 35, 47))
+            setBackgroundColor(LeafColour.OASIS)
         }
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply { addView(content) }
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.rgb(20, 35, 47))
+            setBackgroundColor(LeafColour.OASIS)
             gravity = Gravity.CENTER
         }
         listOf("Accueil", "Automatisations", "Web", "Connexions", "Réglages").forEach { page ->
@@ -75,6 +75,8 @@ class MainActivity : Activity() {
                 textSize = 10f
                 isAllCaps = false
                 setPadding(2, 8, 2, 8)
+                setTextColor(LeafColour.CREAM_DARK)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(LeafColour.WALNUT)
                 setOnClickListener { navigate(page) }
             }
             nav.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -100,20 +102,22 @@ class MainActivity : Activity() {
     private fun heading(value: String) = TextView(this).apply {
         text = value
         textSize = 23f
-        setTextColor(Color.WHITE)
+        setTextColor(LeafColour.WALNUT)
         setPadding(0, 8, 0, 12)
     }
 
     private fun paragraph(value: String) = TextView(this).apply {
         text = value
         textSize = 14f
-        setTextColor(Color.rgb(205, 216, 225))
+        setTextColor(LeafColour.WALNUT)
         setPadding(0, 4, 0, 10)
     }
 
     private fun action(label: String, callback: () -> Unit) = Button(this).apply {
         text = label
         isAllCaps = false
+        setTextColor(LeafColour.CREAM_DARK)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(LeafColour.WALNUT)
         setOnClickListener { callback() }
     }
 
@@ -121,12 +125,12 @@ class MainActivity : Activity() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(14, 12, 14, 12)
-            setBackgroundColor(Color.rgb(25, 39, 52))
+            setBackgroundColor(LeafColour.SAND_BROWN)
         }
         panel.addView(TextView(this).apply {
             text = title
             textSize = 17f
-            setTextColor(Color.WHITE)
+            setTextColor(LeafColour.WALNUT)
         })
         panel.addView(paragraph(description))
         if (actionLabel != null && callback != null) panel.addView(action(actionLabel, callback))
@@ -173,7 +177,7 @@ class MainActivity : Activity() {
         panel.addView(TextView(this).apply {
             text = title
             textSize = 17f
-            setTextColor(Color.WHITE)
+            setTextColor(LeafColour.WALNUT)
         })
         panel.addView(paragraph(description))
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -217,7 +221,7 @@ class MainActivity : Activity() {
         addressBar = EditText(this).apply {
             hint = "Adresse web ou recherche"
             singleLine = true
-            setTextColor(Color.WHITE)
+            setTextColor(LeafColour.WALNUT)
             setHintTextColor(Color.LTGRAY)
             setText("https://www.google.com")
         }
@@ -238,7 +242,7 @@ class MainActivity : Activity() {
         content.addView(tabControls)
         webHost = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(LeafColour.CREAM_DARK)
         }
         content.addView(webHost, LinearLayout.LayoutParams(-1, 0, 1f).apply { height = 900 })
         if (webViews.isEmpty()) addTab("https://www.google.com") else displayActiveTab()
