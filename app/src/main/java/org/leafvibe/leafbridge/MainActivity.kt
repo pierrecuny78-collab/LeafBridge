@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply { addView(content) }
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.rgb(20, 35, 47))
+            setBackgroundColor(LeafColour.OASIS)
             gravity = Gravity.CENTER
         }
         listOf("Accueil", "Automatisations", "Web", "Connexions", "Réglages").forEach { page ->
@@ -75,6 +75,8 @@ class MainActivity : Activity() {
                 textSize = 10f
                 isAllCaps = false
                 setPadding(2, 8, 2, 8)
+                setTextColor(LeafColour.CREAM_DARK)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(LeafColour.WALNUT)
                 setOnClickListener { navigate(page) }
             }
             nav.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -100,7 +102,7 @@ class MainActivity : Activity() {
     private fun heading(value: String) = TextView(this).apply {
         text = value
         textSize = 23f
-        setTextColor(Color.WHITE)
+        setTextColor(LeafColour.WALNUT)
         setPadding(0, 8, 0, 12)
     }
 
@@ -219,7 +221,7 @@ class MainActivity : Activity() {
         addressBar = EditText(this).apply {
             hint = "Adresse web ou recherche"
             singleLine = true
-            setTextColor(Color.WHITE)
+            setTextColor(LeafColour.WALNUT)
             setHintTextColor(Color.LTGRAY)
             setText("https://www.google.com")
         }
